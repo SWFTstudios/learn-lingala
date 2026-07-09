@@ -1,0 +1,10 @@
+{
+  // Cloudflare Workers config — serves this repo as a static site.
+  "name": "learn-lingala",
+  "compatibility_date": "2026-07-09",
+  "assets": {
+    "directory": "./public",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

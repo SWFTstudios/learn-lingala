@@ -5,6 +5,8 @@ starting from the very basics.
 
 ## What's here so far
 
+All pages live in `public/`:
+
 - **Home page** (`index.html`) — introduction and lesson index
 - **Lesson 1: The Alphabet & Sounds** (`alphabet.html`) — the 7 vowels (including ɛ and ɔ),
   consonants, and prenasalized pairs (mb, mp, nd, ng, nk, ns, nt, nz, ny), each with
@@ -15,18 +17,24 @@ starting from the very basics.
 
 ## Running locally
 
-It's a plain static site — no build step, no dependencies. Either open `index.html`
-directly in a browser, or serve the folder:
+It's a plain static site — no build step, no dependencies:
 
 ```bash
-python3 -m http.server 8000
+python3 -m http.server 8000 --directory public
 # then visit http://localhost:8000
 ```
 
 ## Deploying
 
-Works as-is on GitHub Pages (Settings → Pages → deploy from branch), Netlify,
-Vercel, or any static host.
+Deploys to Cloudflare Workers as a static site — `wrangler.jsonc` points at `public/`,
+and the deploy command is just:
+
+```bash
+npx wrangler deploy
+```
+
+It also works on GitHub Pages, Netlify, Vercel, or any static host — serve the
+`public/` folder.
 
 ## Roadmap
 
