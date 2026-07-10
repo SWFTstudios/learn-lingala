@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Learn Lingala — Tóyekola Lingála!</title>
+  <meta name="description" content="Learn Lingala from scratch: the alphabet, pronunciation, and basic sentence structure.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗣️</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav">
+      <a href="index.html" class="brand">Learn<span>Lingala</span></a>
+      <div class="nav-links">
+        <a href="alphabet.html">Alphabet</a>
+        <a href="sentences.html">Sentences</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="hero-greeting">Mbote! 👋</p>
+      <h1>Tóyekola Lingála<br><span class="muted">Let's learn Lingala</span></h1>
+      <p class="hero-sub">
+        Lingala is a Bantu language spoken by more than 40 million people across the
+        Democratic Republic of the Congo, the Republic of the Congo, and beyond.
+        Start from zero — the alphabet, sounds, and your first sentences.
+      </p>
+      <a class="btn btn-primary" href="alphabet.html">Start with the alphabet →</a>
+    </section>
+
+    <section class="builder-section">
+      <h2>Build a sentence right now</h2>
+      <p class="section-sub">
+        Lingala verbs carry their subject as a prefix. Pick the pieces and watch a real
+        sentence assemble itself — this is the whole engine of the language.
+      </p>
+      <div class="builder">
+        <div class="builder-controls">
+          <div class="builder-field">
+            <label for="b-subject">Who?</label>
+            <select id="b-subject"></select>
+          </div>
+          <div class="builder-field">
+            <label for="b-verb">Does what?</label>
+            <select id="b-verb"></select>
+          </div>
+          <div class="builder-field">
+            <label for="b-object">To what?</label>
+            <select id="b-object"></select>
+          </div>
+          <div class="builder-field builder-toggle">
+            <label for="b-negate">Say “not”?</label>
+            <button type="button" id="b-negate" class="toggle" aria-pressed="false">+ te</button>
+          </div>
+        </div>
+        <div class="builder-output">
+          <div class="builder-lingala" id="b-lingala"></div>
+          <div class="builder-breakdown" id="b-breakdown"></div>
+          <div class="builder-english" id="b-english"></div>
+        </div>
+        <p class="builder-hint">
+          The pattern: <strong>subject prefix + verb stem + -i</strong>, and <strong>te</strong>
+          at the end makes it negative. <a href="sentences.html">See the full lesson →</a>
+        </p>
+      </div>
+    </section>
+
+    <section class="flashcards-section">
+      <h2>Your first words</h2>
+      <p class="section-sub">Tap a card to flip it. Tap again to flip it back.</p>
+      <div class="flashcards" id="flashcards"></div>
+    </section>
+
+    <section class="lesson-grid-section">
+      <h2>Lessons</h2>
+      <div class="lesson-grid">
+        <a class="lesson-card" href="alphabet.html">
+          <div class="lesson-num">Lesson 1</div>
+          <h3>The Alphabet &amp; Sounds</h3>
+          <p>The 7 vowels, the consonants, and the special letter pairs like <strong>mb</strong>, <strong>nd</strong>, and <strong>ng</strong> that give Lingala its rhythm.</p>
+          <span class="lesson-cta">Begin →</span>
+        </a>
+        <a class="lesson-card" href="sentences.html">
+          <div class="lesson-num">Lesson 2</div>
+          <h3>Basic Sentence Structure</h3>
+          <p>How Lingala sentences are built: word order, pronouns, verb prefixes, and saying your first real sentences.</p>
+          <span class="lesson-cta">Begin →</span>
+        </a>
+        <div class="lesson-card lesson-card-soon">
+          <div class="lesson-num">Coming soon</div>
+          <h3>Greetings &amp; Everyday Phrases</h3>
+          <p>Mbote, ozali malamu? Small talk, courtesy, and the phrases you'll use every day.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Learn Lingala — free and open source. Tokomonana! (See you soon!)</p>
+  </footer>
+
+  <script src="home.js"></script>
+</body>
+</html>
