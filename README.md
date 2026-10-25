@@ -5,25 +5,47 @@ Learn Lingala at any level: a free, mobile-first learning app built on Cloudflar
 - **`/app/`** is the learning app: bite-sized lessons, spaced-repetition reviews, streaks, accounts and progress sync.
 - **`/`** is the landing page, plus reference guides for the [alphabet](public/alphabet.html) and [sentence structure](public/sentences.html).
 
+## The path to conversational
+
+Five levels, loosely mapped to the CEFR scale, each with "can-do" goals. The course is built for someone heading to Kinshasa who wants to hold real conversations, then sound local.
+
+| Level | Focus | CEFR | Units |
+| --- | --- | --- | --- |
+| 1 · **Arrive** | Survival Lingala | A0 → A1 | Greetings · Survival phrases · Me & you · Numbers & money |
+| 2 · **Get around** | Food, taxis & directions | A1 | Food & drink · Getting around · Time & places · Questions |
+| 3 · **Daily life** | Family, actions & feelings | A1 → A2 | Family & people · Action verbs · Wants, can & "not" · Feelings |
+| 4 · **Conversations** | Past, plans & small talk | A2 → B1 | Past, present & future · About you · Plans & invitations |
+| 5 · **Mwana mboka** | Sound like a local | B1 | Reactions & fillers · Kinshasa street talk · Respect & blessings |
+
+18 units, 227 phrases, 11 real-life dialogues (neighbour, market, taxi, a meal, the phone, a wedding, catching up with a friend, greeting an elder…), 30 pattern drills, and 34 expressions marked **Sounds local**.
+
+- **Level checkpoints:** a mixed test with no hints. Score 80% to earn the level, or to *test out* of a level you already know (its phrases are added to your reviews).
+- **Pace estimate:** the home screen shows when you'll finish Level 4 at your daily goal.
+- **Phrasebook:** every phrase, searchable in English or Lingala, with a "Sounds local" filter. Handy on a trip.
+
 ## How the app teaches
 
-Each part of a session follows a finding from learning research:
+Each part of a session follows a finding from language-learning research:
 
 | Technique | In the app |
 | --- | --- |
-| **Retrieval practice** | Every new word is tested minutes after it's introduced, never just shown. |
-| **Desirable difficulty** | Each word moves from recognising it (multiple choice), to assembling it (word tiles), to recalling it (typing). |
+| **Chunks first** | Fluent speakers rely on ready-made phrases ("Likambo te", "Kaka bongo"). The course teaches whole phrases, not just single words. |
+| **Pattern drills** | Change one sentence into another (*Nasali → Nakosala*, I → we, yesterday → tomorrow, friend → elder) so you learn the rule, not a list. |
+| **Comprehensible input** | Each unit opens with its rule and a real conversation you can read (tap a line for the English). |
+| **Role-play** | Choose what *you* would say at each turn of a dialogue, then say your lines out loud. |
+| **Retrieval practice** | Every new phrase is tested minutes after it's introduced, never just shown. |
+| **Desirable difficulty** | Recognise (multiple choice) → assemble (tiles or pattern drill) → recall (typing) → speak (say it aloud, then self-grade). |
 | **Spaced repetition** | An SM-2-style scheduler times reviews for just before you'd forget (1 day → 3 → ~1 week → a month…). |
-| **Interleaving** | Lessons mix new words, due reviews and production. |
+| **Interleaving** | Lessons mix new phrases, due reviews and production. |
 | **Error correction** | A missed question comes back a few steps later in the same session. |
-| **Explicit grammar** | Each unit opens with a short rule (subject prefixes, `te` negation, `nazali + verb`…) before practice. |
-| **Habit** | Daily XP goal, streaks, and a nudge when reviews are due. |
+| **Cultural fluency** | "Local tips" cover French code-switching, respect forms for elders (*bo-*/*bino*), and Kinshasa slang. |
+| **Habit** | Daily XP goal, streaks, a 7-day chart, and a nudge when reviews are due. |
 
 Typing is forgiving: tone marks are optional, `e`/`o` are accepted for `ɛ`/`ɔ`, and one-letter slips count as right (the correct spelling is still shown).
 
-The course has 9 units and about 110 words and phrases: greetings, pronouns & *kozala*, family, numbers, food, action verbs, wants & negation, questions, and time & places. Content lives in [`public/app/js/course.js`](public/app/js/course.js); add an item there and it automatically becomes a lesson step and a review card.
+Content lives in [`public/app/js/course.js`](public/app/js/course.js). An item added there automatically becomes lesson steps, review cards and phrasebook entries. **Never change an existing item `id`**: learners' progress is keyed by it (`npm test` checks the original ids are still there).
 
-> **Content review:** have the Lingala in `course.js` checked by a native speaker before promoting the app widely. Usage varies between Kinshasa and Brazzaville, and tone marks especially should be verified.
+> **Content review:** have the Lingala in `course.js`, especially Level 5 (slang and respect forms) and the tone marks, checked by native speakers before promoting the app widely. Usage varies between Kinshasa and Brazzaville.
 
 ## Architecture
 
@@ -32,7 +54,7 @@ public/            Static assets (Workers Static Assets, served from the edge ca
   app/             The learning app: vanilla JS modules, no build step
     js/course.js   Course content
     js/srs.js      Spaced-repetition scheduler
-    js/lesson.js   Session builder (what to teach, which exercise, ordering)
+    js/lesson.js   Session builder: lessons, reviews, role-plays, checkpoints, pace
     js/player.js   Exercise UI
     js/store.js    Local state + server sync
     sw.js          Service worker (offline support, installable PWA)
@@ -79,7 +101,8 @@ Turnstile stays off until the secret is set.
 
 ## Roadmap
 
-- Native-speaker audio for every word (stored in R2) and listening exercises
+- Native-speaker audio for every phrase (stored in R2): listening exercises and shadowing (repeating right after the speaker)
+- Record-and-compare speaking practice once reference audio exists
 - Password reset by email
-- More units: past tense, directions, shopping, conversation dialogues
+- More Level 4–5 content: storytelling, opinions, proverbs (*masese*), song lyrics
 - Leaderboards and friend streaks
