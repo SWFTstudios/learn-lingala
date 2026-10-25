@@ -1,10 +1,10 @@
 // Runs a learning session: renders each exercise, checks answers, re-queues
 // mistakes, then grades every card through the SRS scheduler.
 
-import { ITEM_BY_ID, UNIT_BY_ID } from './course.js';
+import { ITEM_BY_ID, UNIT_BY_ID, LEVEL_BY_ID, levelItems } from './course.js';
 import { checkTyped, normalize } from './answer.js';
-import { choices, tiles, acceptedAnswers, shuffle } from './lesson.js';
-import { schedule, newCard } from './srs.js';
+import { choices, replyChoices, tiles, acceptedAnswers, shuffle, CHECKPOINT_PASS } from './lesson.js';
+import { schedule, newCard, isLearned } from './srs.js';
 import { getCard, putCards, addXp } from './store.js';
 
 const esc = (s) =>
@@ -38,9 +38,121 @@ const soundWrong = () => {
   navigator.vibrate?.(80);
 };
 
+// --- Shared bits --------------------------------------------------------------
+
+function bubble(line, { reveal = false } = {}) {
+  return `
+    <button type="button" class="bubble bubble-${line.who} ${reveal ? 'revealed' : ''}">
+      <span class="bubble-who">${line.who === 'you' ? 'You' : 'Them'}</span>
+      <span class="bubble-lg" lang="ln">${esc(line.lg)}</span>
+      <span class="bubble-en">${esc(line.en)}</span>
+    </button>`;
+}
+
+function wireBubbles(el) {
+  el.querySelectorAll('.bubble').forEach((b) => b.addEventListener('click', () => b.classList.toggle('revealed')));
+}
+
+function choiceList(options, render) {
+  return `<div class="options">${options
+    .map((o, i) => `<button type="button" class="option" data-key="${i}"><span class="key">${i + 1}</span>${render(o)}</button>`)
+    .join('')}</div>`;
+}
+
+// A multiple-choice exercise over `options`, where `isRight(option)` marks the answer.
+function choiceExercise({ html, options, render, isRight, answer, sub }) {
+  let picked = null;
+  return {
+    html: html + choiceList(options, render),
+    mount(el, setReady) {
+      el.querySelectorAll('.option').forEach((btn) =>
+        btn.addEventListener('click', () => {
+          el.querySelectorAll('.option').forEach((b) => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          picked = options[Number(btn.dataset.key)];
+          setReady(true);
+        }),
+      );
+      wireBubbles(el);
+    },
+    key(k, el) {
+      el.querySelectorAll('.option')[Number(k) - 1]?.click();
+    },
+    check(el) {
+      el.querySelectorAll('.option').forEach((b) => {
+        const o = options[Number(b.dataset.key)];
+        b.disabled = true;
+        if (isRight(o)) b.classList.add('correct');
+        else if (o === picked) b.classList.add('wrong');
+      });
+      return { ok: !!picked && isRight(picked), answer, sub };
+    },
+  };
+}
+
+// A typed-answer exercise. `header` is the HTML above the input.
+function typedExercise({ header, accepted, answer, sub }) {
+  let started = 0;
+  return {
+    html: `${header}
+      <input class="type-input" lang="ln" autocomplete="off" autocapitalize="off" autocorrect="off"
+             spellcheck="false" enterkeyhint="done" placeholder="Type in Lingala" aria-label="Your answer">
+      <div class="special-keys">
+        <button type="button" class="key-btn" data-ch="ɛ">ɛ</button>
+        <button type="button" class="key-btn" data-ch="ɔ">ɔ</button>
+        <span class="hint">Accents optional — plain e and o work too.</span>
+      </div>`,
+    mount(el, setReady) {
+      const input = el.querySelector('.type-input');
+      input.addEventListener('input', () => {
+        started ||= Date.now();
+        setReady(input.value.trim().length > 0);
+      });
+      el.querySelectorAll('.key-btn').forEach((b) =>
+        b.addEventListener('click', () => {
+          const { selectionStart: s, selectionEnd: e, value } = input;
+          input.value = value.slice(0, s) + b.dataset.ch + value.slice(e);
+          input.setSelectionRange(s + 1, s + 1);
+          input.focus();
+          input.dispatchEvent(new Event('input'));
+        }),
+      );
+      setTimeout(() => input.focus(), 50);
+    },
+    check(el) {
+      const input = el.querySelector('.type-input');
+      input.disabled = true;
+      const verdict = checkTyped(input.value, accepted);
+      input.classList.add(verdict === 'wrong' ? 'wrong' : 'correct');
+      return { ok: verdict !== 'wrong', typo: verdict === 'typo', fast: started && Date.now() - started < 6000, answer, sub };
+    },
+  };
+}
+
+// Say it out loud, reveal, then grade yourself honestly.
+function speakExercise({ header, answer, sub, extra = '' }) {
+  return {
+    selfGraded: true,
+    html: `${header}
+      <div class="speak-cue" aria-hidden="true">🗣️</div>
+      <p class="speak-instr">Say it <strong>out loud</strong> before you check.</p>
+      <div class="speak-answer" hidden>
+        <div class="speak-lg" lang="ln">${esc(answer)}</div>
+        ${extra}
+      </div>`,
+    actionLabel: 'Show answer',
+    mount(el, setReady) {
+      setReady(true);
+    },
+    check(el, ask) {
+      el.querySelector('.speak-answer').hidden = false;
+      el.querySelector('.speak-instr').textContent = 'Did you say it like this?';
+      return ask().then((ok) => ({ ok, answer, sub, selfGraded: true }));
+    },
+  };
+}
+
 // --- Exercises ----------------------------------------------------------------
-// Each returns { html, mount(el, setReady), check() → {ok, typo?, answer} }
-// or { html, mount, auto: true } for steps that need no checking.
 
 function notesStep(step) {
   const unit = UNIT_BY_ID.get(step.unitId);
@@ -48,8 +160,21 @@ function notesStep(step) {
     auto: true,
     html: `
       <div class="ex-label">New unit · ${esc(unit.title)}</div>
-      <h2 class="ex-title">${unit.emoji} ${esc(unit.lg)}</h2>
+      <h2 class="ex-title">${unit.emoji} <span lang="ln">${esc(unit.lg)}</span></h2>
       <div class="notes">${unit.intro}</div>`,
+  };
+}
+
+function dialogueStep(step) {
+  const d = UNIT_BY_ID.get(step.unitId).dialogue;
+  return {
+    auto: true,
+    html: `
+      <div class="ex-label">Conversation · ${esc(d.title)}</div>
+      <p class="setting">${esc(d.setting)}</p>
+      <p class="hint">Read it out loud. Tap a line to see the English — try to guess first.</p>
+      <div class="chat">${d.lines.map((l) => bubble(l)).join('')}</div>`,
+    mount: wireBubbles,
   };
 }
 
@@ -57,53 +182,46 @@ function introStep(item) {
   return {
     auto: true,
     html: `
-      <div class="ex-label"><span class="badge">New</span> Learn this</div>
+      <div class="ex-label"><span class="badge">New</span> ${item.local ? '<span class="badge badge-local">Sounds local</span>' : ''} Learn this</div>
       <div class="intro-card">
         <div class="intro-lg" lang="ln">${esc(item.lg)}</div>
         <div class="intro-en">${esc(item.en)}</div>
         ${item.note ? `<div class="intro-note">${item.note}</div>` : ''}
-      </div>`,
+      </div>
+      ${item.tip ? `<div class="local-tip"><strong>🇨🇩 Local tip</strong> ${item.tip}</div>` : ''}`,
   };
 }
 
 function mcStep(item, reverse) {
-  const opts = choices(item, reverse ? 'lg' : 'en');
-  let picked = null;
-  return {
+  const field = reverse ? 'lg' : 'en';
+  return choiceExercise({
     html: `
       <div class="ex-label">${reverse ? 'How do you say this in Lingala?' : 'What does this mean?'}</div>
-      <div class="prompt ${reverse ? '' : 'prompt-lg'}" ${reverse ? '' : 'lang="ln"'}>${esc(reverse ? item.en : item.lg)}</div>
-      <div class="options">
-        ${opts
-          .map(
-            (o, i) => `<button type="button" class="option" data-id="${o.id}" ${reverse ? 'lang="ln"' : ''}>
-              <span class="key">${i + 1}</span>${esc(reverse ? o.lg : o.en)}</button>`,
-          )
-          .join('')}
-      </div>`,
-    mount(el, setReady) {
-      el.querySelectorAll('.option').forEach((btn) =>
-        btn.addEventListener('click', () => {
-          el.querySelectorAll('.option').forEach((b) => b.classList.remove('selected'));
-          btn.classList.add('selected');
-          picked = btn.dataset.id;
-          setReady(true);
-        }),
-      );
-    },
-    key(k, el) {
-      const btn = el.querySelectorAll('.option')[Number(k) - 1];
-      btn?.click();
-    },
-    check(el) {
-      el.querySelectorAll('.option').forEach((b) => {
-        b.disabled = true;
-        if (b.dataset.id === item.id) b.classList.add('correct');
-        else if (b.dataset.id === picked) b.classList.add('wrong');
-      });
-      return { ok: picked === item.id, answer: reverse ? item.lg : item.en };
-    },
-  };
+      <div class="prompt ${reverse ? '' : 'prompt-lg'}" ${reverse ? '' : 'lang="ln"'}>${esc(reverse ? item.en : item.lg)}</div>`,
+    options: choices(item, field),
+    render: (o) => (reverse ? `<span lang="ln">${esc(o.lg)}</span>` : esc(o.en)),
+    isRight: (o) => o.id === item.id,
+    answer: reverse ? item.lg : item.en,
+    sub: `${item.en} = ${item.lg}`,
+  });
+}
+
+function replyStep(step) {
+  const lines = UNIT_BY_ID.get(step.unitId).dialogue.lines;
+  const answer = lines[step.line];
+  const context = lines.slice(Math.max(0, step.line - 2), step.line);
+  return choiceExercise({
+    html: `
+      <div class="ex-label">Your turn — what do you say?</div>
+      <p class="setting">${esc(UNIT_BY_ID.get(step.unitId).dialogue.setting)}</p>
+      <div class="chat">${context.map((l) => bubble(l)).join('') || '<p class="hint">You start the conversation.</p>'}</div>
+      <p class="hint">Hint: ${esc(answer.en)}</p>`,
+    options: replyChoices(step.unitId, step.line),
+    render: (o) => `<span lang="ln">${esc(o.lg)}</span>`,
+    isRight: (o) => normalize(o.lg) === normalize(answer.lg),
+    answer: answer.lg,
+    sub: answer.en,
+  });
 }
 
 function tilesStep(item) {
@@ -147,50 +265,56 @@ function tilesStep(item) {
     check(el) {
       el.querySelectorAll('.tile').forEach((b) => (b.disabled = true));
       const got = normalize(chosen.map((t) => t.word).join(' '));
-      return { ok: acceptedAnswers(item).some((a) => normalize(a) === got), answer: item.lg };
+      return { ok: acceptedAnswers(item).some((a) => normalize(a) === got), answer: item.lg, sub: item.en };
     },
   };
 }
 
 function typeStep(item) {
-  let started = 0;
-  return {
-    html: `
-      <div class="ex-label">Type this in Lingala</div>
-      <div class="prompt">${esc(item.en)}</div>
-      <input class="type-input" lang="ln" autocomplete="off" autocapitalize="off" autocorrect="off"
-             spellcheck="false" enterkeyhint="done" placeholder="Type your answer" aria-label="Your answer">
-      <div class="special-keys">
-        <button type="button" class="key-btn" data-ch="ɛ">ɛ</button>
-        <button type="button" class="key-btn" data-ch="ɔ">ɔ</button>
-        <span class="hint">Accents optional — plain e and o work too.</span>
+  return typedExercise({
+    header: `<div class="ex-label">Type this in Lingala</div><div class="prompt">${esc(item.en)}</div>`,
+    accepted: acceptedAnswers(item),
+    answer: item.lg,
+    sub: item.en,
+  });
+}
+
+function transformStep(item) {
+  const d = item.drill;
+  return typedExercise({
+    header: `
+      <div class="ex-label">Pattern drill — change the sentence</div>
+      <div class="drill">
+        <div class="drill-from"><span lang="ln">${esc(d.from)}</span><small>${esc(d.fromEn)}</small></div>
+        <div class="drill-cue">→ ${esc(d.cue)}</div>
       </div>`,
-    mount(el, setReady) {
-      const input = el.querySelector('.type-input');
-      input.addEventListener('input', () => {
-        started ||= Date.now();
-        setReady(input.value.trim().length > 0);
-      });
-      el.querySelectorAll('.key-btn').forEach((b) =>
-        b.addEventListener('click', () => {
-          const { selectionStart: s, selectionEnd: e, value } = input;
-          input.value = value.slice(0, s) + b.dataset.ch + value.slice(e);
-          input.setSelectionRange(s + 1, s + 1);
-          input.focus();
-          input.dispatchEvent(new Event('input'));
-        }),
-      );
-      setTimeout(() => input.focus(), 50);
-    },
-    check(el) {
-      const input = el.querySelector('.type-input');
-      input.disabled = true;
-      const verdict = checkTyped(input.value, acceptedAnswers(item));
-      const fast = started && Date.now() - started < 6000;
-      input.classList.add(verdict === 'wrong' ? 'wrong' : 'correct');
-      return { ok: verdict !== 'wrong', typo: verdict === 'typo', fast, answer: item.lg };
-    },
-  };
+    accepted: acceptedAnswers(item),
+    answer: item.lg,
+    sub: item.en,
+  });
+}
+
+function speakStep(item) {
+  return speakExercise({
+    header: `<div class="ex-label">Speak</div><div class="prompt">${esc(item.en)}</div>`,
+    answer: item.lg,
+    sub: item.en,
+    extra: item.tip ? `<div class="local-tip"><strong>🇨🇩</strong> ${item.tip}</div>` : '',
+  });
+}
+
+function speakLineStep(step) {
+  const d = UNIT_BY_ID.get(step.unitId).dialogue;
+  const line = d.lines[step.line];
+  const prev = d.lines[step.line - 1];
+  return speakExercise({
+    header: `
+      <div class="ex-label">Role-play — say your line</div>
+      <div class="chat">${prev ? bubble(prev, { reveal: true }) : ''}</div>
+      <div class="prompt">${esc(line.en)}</div>`,
+    answer: line.lg,
+    sub: line.en,
+  });
 }
 
 function matchStep(step, onMistake) {
@@ -240,22 +364,45 @@ function matchStep(step, onMistake) {
   };
 }
 
+function exerciseFor(step, onMatchMistake) {
+  const item = step.itemId && ITEM_BY_ID.get(step.itemId);
+  switch (step.type) {
+    case 'notes': return notesStep(step);
+    case 'dialogue': return dialogueStep(step);
+    case 'intro': return introStep(item);
+    case 'mc': return mcStep(item, false);
+    case 'mc-rev': return mcStep(item, true);
+    case 'tiles': return tilesStep(item);
+    case 'type': return typeStep(item);
+    case 'transform': return transformStep(item);
+    case 'speak': return speakStep(item);
+    case 'reply': return replyStep(step);
+    case 'speak-line': return speakLineStep(step);
+    case 'match': return matchStep(step, onMatchMistake);
+    default: throw new Error(`Unknown step type: ${step.type}`);
+  }
+}
+
+// Results are tracked per card; dialogue lines without a card get their own key.
+const resultKey = (step) => step.itemId || `line:${step.unitId}:${step.line}`;
+
 // --- Session runner -----------------------------------------------------------
 
 export function runSession(root, session, { onExit, onFinish }) {
   const queue = session.steps.slice();
-  const results = {}; // itemId → { mistakes, typo, fast, seen }
-  const result = (id) => (results[id] ??= { mistakes: 0, typo: false, fast: true, tested: false });
+  const results = {};
+  const result = (key) => (results[key] ??= { mistakes: 0, typo: false, fast: true, tested: false });
   let index = 0;
   let correct = 0;
   let answered = 0;
   let combo = 0;
   const startedAt = Date.now();
+  const isTest = session.kind === 'checkpoint';
 
   root.innerHTML = `
     <div class="session">
       <header class="session-top">
-        <button type="button" class="icon-btn quit" aria-label="Quit lesson">✕</button>
+        <button type="button" class="icon-btn quit" aria-label="Quit">✕</button>
         <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar"></div></div>
         <span class="combo" aria-live="polite"></span>
       </header>
@@ -273,17 +420,17 @@ export function runSession(root, session, { onExit, onFinish }) {
   const bar = root.querySelector('.progress-bar');
   const comboEl = root.querySelector('.combo');
   let current = null;
-  let phase = 'answer'; // 'answer' | 'continue'
+  let phase = 'answer'; // 'answer' | 'waiting' | 'continue'
 
   root.querySelector('.quit').addEventListener('click', () => {
-    if (index === 0 || confirm('Quit this lesson? Progress from this lesson will not be saved.')) {
+    if (index === 0 || confirm('Quit now? Progress from this session will not be saved.')) {
       cleanup();
       onExit();
     }
   });
 
   function onKey(e) {
-    if (e.key === 'Enter' && !action.disabled) {
+    if (e.key === 'Enter' && !action.disabled && !action.hidden) {
       e.preventDefault();
       action.click();
     } else if (phase === 'answer' && /^[1-4]$/.test(e.key) && current?.key && document.activeElement?.tagName !== 'INPUT') {
@@ -302,20 +449,13 @@ export function runSession(root, session, { onExit, onFinish }) {
     bar.style.width = `${Math.round((index / queue.length) * 100)}%`;
     foot.className = 'session-foot';
     feedback.innerHTML = '';
+    action.hidden = false;
     phase = 'answer';
 
-    const item = step.itemId && ITEM_BY_ID.get(step.itemId);
-    current =
-      step.type === 'notes' ? notesStep(step)
-      : step.type === 'intro' ? introStep(item)
-      : step.type === 'mc' ? mcStep(item, false)
-      : step.type === 'mc-rev' ? mcStep(item, true)
-      : step.type === 'tiles' ? tilesStep(item)
-      : step.type === 'type' ? typeStep(item)
-      : matchStep(step, (id) => {
-          result(id).mistakes += 1;
-          result(id).tested = true;
-        });
+    current = exerciseFor(step, (id) => {
+      result(id).mistakes += 1;
+      result(id).tested = true;
+    });
 
     body.innerHTML = `<div class="exercise">${current.html}</div>`;
     body.scrollTop = 0;
@@ -323,24 +463,46 @@ export function runSession(root, session, { onExit, onFinish }) {
       phase = 'continue';
       action.textContent = 'Continue';
       action.disabled = false;
-    } else if (current.auto === 'when-done') {
+      current.mount?.(body);
+      return;
+    }
+    if (current.auto === 'when-done') {
       phase = 'continue';
       action.textContent = 'Continue';
       action.disabled = true;
       current.mount(body, (ready) => (action.disabled = !ready));
       return;
-    } else {
-      action.textContent = 'Check';
-      action.disabled = true;
     }
+    action.textContent = current.actionLabel || 'Check';
+    action.disabled = true;
     current.mount?.(body, setReady);
   }
 
-  function check() {
+  // Self-grading buttons for speaking exercises.
+  function askSelfGrade() {
+    phase = 'waiting';
+    action.hidden = true;
+    feedback.innerHTML = `
+      <div class="self-grade">
+        <button type="button" class="btn btn-secondary" data-ok="0">✗ Not quite</button>
+        <button type="button" class="btn btn-primary" data-ok="1">✓ I said it</button>
+      </div>`;
+    return new Promise((resolve) =>
+      feedback.querySelectorAll('[data-ok]').forEach((b) =>
+        b.addEventListener('click', () => {
+          action.hidden = false;
+          resolve(b.dataset.ok === '1');
+        }),
+      ),
+    );
+  }
+
+  async function check() {
     const step = queue[index];
-    const r = result(step.itemId);
+    const r = result(resultKey(step));
     r.tested = true;
-    const outcome = current.check(body);
+    action.disabled = true;
+    const outcome = await current.check(body, askSelfGrade);
     answered++;
     phase = 'continue';
 
@@ -349,21 +511,22 @@ export function runSession(root, session, { onExit, onFinish }) {
       if (outcome.typo) r.typo = true;
       if (step.type === 'type' && !outcome.fast) r.fast = false;
       combo++;
-      soundRight();
+      if (!outcome.selfGraded) soundRight();
       foot.classList.add('good');
-      const praise = ['Malamu!', 'Kitoko!', 'Malamu mingi!', 'Yes!'][Math.floor(Math.random() * 4)];
+      const praise = ['Malamu!', 'Kitoko!', 'Malamu mingi!', 'Ya solo!', 'Ebongi!'][Math.floor(Math.random() * 5)];
       feedback.innerHTML = outcome.typo
         ? `<strong>Almost!</strong> Watch the spelling: <span lang="ln">${esc(outcome.answer)}</span>`
-        : `<strong>${praise}</strong>`;
+        : `<strong>${praise}</strong>${outcome.selfGraded ? '' : ` <span class="feedback-sub">${esc(outcome.sub || '')}</span>`}`;
     } else {
       r.mistakes++;
       combo = 0;
-      soundWrong();
+      if (!outcome.selfGraded) soundWrong();
       foot.classList.add('bad');
-      feedback.innerHTML = `<strong>Correct answer:</strong> <span lang="ln">${esc(outcome.answer)}</span>
-        <div class="feedback-sub">${esc(ITEM_BY_ID.get(step.itemId).en)} = ${esc(ITEM_BY_ID.get(step.itemId).lg)}</div>`;
+      feedback.innerHTML = `<strong>${outcome.selfGraded ? "Keep practising — it'll come back soon." : 'Correct answer:'}</strong>
+        ${outcome.selfGraded ? '' : `<span lang="ln">${esc(outcome.answer)}</span>`}
+        <div class="feedback-sub">${esc(outcome.sub || '')}</div>`;
       // Ask again a few steps later — retrieval right after an error is where learning happens.
-      queue.splice(Math.min(queue.length, index + 3), 0, { type: step.type, itemId: step.itemId });
+      if (!session.noRequeue) queue.splice(Math.min(queue.length, index + 3), 0, { ...step });
     }
     comboEl.textContent = combo >= 3 ? `🔥 ${combo}` : '';
     action.textContent = 'Continue';
@@ -372,6 +535,7 @@ export function runSession(root, session, { onExit, onFinish }) {
 
   action.addEventListener('click', () => {
     if (phase === 'answer') return check();
+    if (phase !== 'continue') return;
     index++;
     if (index < queue.length) render();
     else finish();
@@ -380,27 +544,43 @@ export function runSession(root, session, { onExit, onFinish }) {
   function finish() {
     cleanup();
     const now = Date.now();
-    const updated = [];
+    const score = answered ? correct / answered : 1;
+    const passed = isTest && score >= CHECKPOINT_PASS;
+    const updated = new Map();
     const newIds = new Set(session.newIds);
+
     for (const id of session.itemIds) {
       const r = results[id];
       if (!r?.tested) continue;
-      const grade = r.mistakes > 0 ? 0 : r.typo ? 1 : r.fast && !newIds.has(id) && (getCard(id)?.reps ?? 0) >= 2 ? 3 : 2;
-      updated.push(schedule(getCard(id) || newCard(id, now), grade, now));
+      const card = getCard(id);
+      if (isTest && !isLearned(card) && !passed) continue; // a failed test doesn't add new cards
+      const grade = r.mistakes > 0 ? 0 : r.typo ? 1 : r.fast && !newIds.has(id) && (card?.reps ?? 0) >= 2 ? 3 : 2;
+      updated.set(id, schedule(card || newCard(id, now), grade, now));
     }
-    putCards(updated);
+    // Testing out: everything else in the level joins your reviews, due soon to confirm it.
+    let testedOut = 0;
+    if (passed) {
+      for (const item of levelItems(session.levelId)) {
+        if (updated.has(item.id) || isLearned(getCard(item.id))) continue;
+        updated.set(item.id, schedule(newCard(item.id, now), 1, now));
+        testedOut++;
+      }
+    }
+    putCards([...updated.values()]);
 
-    const perfect = Object.values(results).every((r) => r.mistakes === 0);
-    const xp = correct + 5 + (perfect ? 5 : 0);
+    const perfect = answered > 0 && correct === answered;
+    const xp = correct + 5 + (perfect ? 5 : 0) + (passed ? 20 : 0);
     addXp(xp);
 
     onFinish({
+      kind: session.kind,
       xp,
       perfect,
-      accuracy: answered ? Math.round((correct / answered) * 100) : 100,
+      accuracy: Math.round(score * 100),
       learned: session.newIds.length,
       reviewed: session.itemIds.length - session.newIds.length,
       seconds: Math.round((now - startedAt) / 1000),
+      checkpoint: isTest ? { passed, level: LEVEL_BY_ID.get(session.levelId), testedOut } : null,
     });
   }
 
