@@ -10,6 +10,7 @@ import {
 import { runSession } from './player.js';
 import { api } from './api.js';
 import * as store from './store.js';
+import { chatPickerHtml, mountChat, isScenario, clearChats } from './chat.js';
 
 const app = document.getElementById('app');
 const esc = (s) =>
@@ -17,7 +18,7 @@ const esc = (s) =>
 
 const CONVERSATIONAL = 'conversations'; // the level that marks "conversational"
 
-let config = { turnstileSiteKey: null };
+let config = { turnstileSiteKey: null, chatEnabled: null }; // null = still loading
 let stopSession = null;
 
 // --- Layout -------------------------------------------------------------------
@@ -45,6 +46,7 @@ function shell(active, content) {
     <nav class="tabbar" aria-label="Main">
       ${tab('learn', '#/', '📚', 'Learn')}
       ${tab('review', '#/review', '🔁', 'Review', due ? `<b class="dot">${due}</b>` : '')}
+      ${tab('chat', '#/chat', '💬', 'Chat')}
       ${tab('phrases', '#/phrases', '🗂️', 'Phrases')}
       ${tab('account', '#/account', u ? '👤' : '☁️', u ? 'Account' : 'Save')}
     </nav>`;
@@ -170,6 +172,12 @@ function homeScreen() {
     }
 
     ${pathCard()}
+
+    <a href="#/chat" class="chat-card">
+      <span class="chat-card-emoji" aria-hidden="true">💬</span>
+      <span><strong>Practise a real conversation</strong>
+      <span class="muted small">Text with Mama Nzeba, a market seller, a taxi driver… in Lingala, live.</span></span>
+    </a>
 
     <section class="stats-row">
       <div class="stat"><b>${learned}</b><span>phrases learned</span></div>
@@ -370,6 +378,13 @@ function phrasesScreen() {
   );
 }
 
+function chatScreen() {
+  return shell(
+    'chat',
+    chatPickerHtml({ chatEnabled: config.chatEnabled, signedIn: !!store.user(), currentLevelId: currentLevel().id }),
+  );
+}
+
 function accountScreen(mode = 'signup') {
   const u = store.user();
   const goal = store.dailyGoal();
@@ -490,6 +505,7 @@ function wireAccount() {
   document.getElementById('signout')?.addEventListener('click', async () => {
     if (store.hasUnsynced() && !navigator.onLine && !confirm("You're offline and some progress hasn't synced. Sign out anyway?")) return;
     await store.signOut();
+    clearChats(); // conversations are private to the signed-in learner
     location.hash = '#/';
   });
 
@@ -499,6 +515,7 @@ function wireAccount() {
     if (!confirm('Delete your account and all progress permanently?')) return;
     try {
       await store.deleteAccount(new FormData(del).get('password'));
+      clearChats();
       location.hash = '#/';
     } catch (err) {
       del.querySelector('.form-error').textContent = err.message;
@@ -619,12 +636,24 @@ function render() {
     location.hash = '#/review';
     return;
   }
+  if (route === 'chat' && isScenario(arg) && config.chatEnabled && store.user()) {
+    document.body.classList.add('in-session');
+    stopSession = mountChat(app, arg, {
+      onExit: () => {
+        endSession();
+        history.replaceState(null, '', '#/chat');
+        render();
+      },
+    });
+    return;
+  }
 
   app.innerHTML =
     route === 'unit' ? unitScreen(arg)
     : route === 'level' ? levelScreen(arg)
     : route === 'review' ? reviewScreen()
     : route === 'phrases' ? phrasesScreen()
+    : route === 'chat' ? chatScreen()
     : route === 'account' ? accountScreen(arg === 'login' ? 'login' : 'signup')
     : homeScreen();
 
@@ -654,8 +683,13 @@ store.refreshUser().then(() => {
   if (!stopSession && !document.querySelector('.summary')) render();
 });
 api('config')
-  .then((c) => (config = c))
-  .catch(() => {});
+  .then((c) => {
+    config = c;
+    if (location.hash.startsWith('#/chat') && !stopSession) render(); // chat availability is now known
+  })
+  .catch(() => {
+    config = { ...config, chatEnabled: false };
+  });
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {});

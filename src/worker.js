@@ -1,9 +1,13 @@
 // Learn Lingala API Worker. Static files in public/ are served by Workers
 // Static Assets; only /api/* requests reach this code (see wrangler.jsonc).
 
-import schemaSql from '../migrations/0001_init.sql';
+import initSql from '../migrations/0001_init.sql';
+import chatSql from '../migrations/0002_chat.sql';
 import { HttpError, json, readJson, checkOrigin, clientIp, getCookie, rateLimit } from './http.js';
 import { hashPassword, verifyPassword, burnPasswordCheck, newSessionToken, sha256Hex } from './crypto.js';
+import { chatTurn } from './chat.js';
+
+const schemaSql = `${initSql}\n${chatSql}`;
 
 const SESSION_COOKIE = 'll_session';
 const SESSION_DAYS = 30;
@@ -212,6 +216,7 @@ async function deleteMe(request, env, url) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM cards WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM xp_events WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM chat_usage WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id),
   ]);
@@ -293,7 +298,15 @@ async function handleApi(request, env, url) {
   const route = `${request.method} ${url.pathname}`;
   switch (route) {
     case 'GET /api/config':
-      return json({ turnstileSiteKey: env.TURNSTILE_SECRET_KEY ? env.TURNSTILE_SITE_KEY || null : null });
+      return json({
+        turnstileSiteKey: env.TURNSTILE_SECRET_KEY ? env.TURNSTILE_SITE_KEY || null : null,
+        chatEnabled: !!env.ANTHROPIC_API_KEY,
+      });
+    case 'POST /api/chat': {
+      const user = await requireUser(request, env);
+      await rateLimit(env.CHAT_LIMITER, `chat:${user.id}`);
+      return json(await chatTurn(env, user, await readJson(request, 64 * 1024)));
+    }
     case 'POST /api/auth/signup':
       return signup(request, env, url);
     case 'POST /api/auth/login':
