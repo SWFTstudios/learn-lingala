@@ -1,10 +1,37 @@
 {
-  // Cloudflare Workers config — serves this repo as a static site.
+  // Cloudflare Workers config: static site + learning app in public/,
+  // API Worker in src/ for accounts and progress sync.
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "learn-lingala",
-  "compatibility_date": "2026-07-09",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-13",
+  "upload_source_maps": true,
   "assets": {
     "directory": "./public",
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
-  }
+    "not_found_handling": "404-page",
+    // Only API calls run the Worker; everything else is served straight from the edge cache.
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "learn-lingala-db",
+      "database_id": "56bd23e6-aee2-4107-86af-d96245f1d200",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ratelimits": [
+    // Sign-up / sign-in attempts per IP.
+    { "name": "AUTH_LIMITER", "namespace_id": "4801", "simple": { "limit": 10, "period": 60 } },
+    // All API calls per IP.
+    { "name": "API_LIMITER", "namespace_id": "4802", "simple": { "limit": 120, "period": 60 } }
+  ],
+  "vars": {
+    // Optional bot protection: create a Turnstile widget, put its site key here,
+    // and run `npx wrangler secret put TURNSTILE_SECRET_KEY`.
+    "TURNSTILE_SITE_KEY": ""
+  },
+  "observability": { "enabled": true }
 }
