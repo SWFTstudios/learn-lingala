@@ -387,3 +387,9 @@ tr:last-child td { border-bottom: none; }
   .hero { padding: 2.5rem 0 1.5rem; }
   .letter-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 }
+
+/* Links into the learning app */
+.nav-links a.nav-app { color: var(--primary-ink); background: var(--primary); padding: 0.3rem 0.8rem; border-radius: 999px; }
+.nav-links a.nav-app:hover { color: var(--primary-ink); filter: brightness(1.1); }
+.hero-alt { margin-top: 0.9rem; font-size: 0.9rem; color: var(--muted); }
+.hero-alt a { color: var(--primary); font-weight: 600; }
