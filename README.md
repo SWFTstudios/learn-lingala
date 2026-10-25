@@ -22,6 +22,26 @@ Five levels, loosely mapped to the CEFR scale, each with "can-do" goals. The cou
 - **Level checkpoints:** a mixed test with no hints. Score 80% to earn the level, or to *test out* of a level you already know (its phrases are added to your reviews).
 - **Pace estimate:** the home screen shows when you'll finish Level 4 at your daily goal.
 - **Phrasebook:** every phrase, searchable in English or Lingala, with a "Sounds local" filter. Handy on a trip.
+- **Live chat practice:** text in real time with Claude-powered Lingala speakers (see below).
+
+## Live chat practice
+
+The **Chat** tab is a text conversation with a Lingala speaker in character: Mama Nzeba the neighbour, a market seller, a taxi driver, a cousin, a friend from Matonge, a respected elder, or open conversation. Most partners come with a **mission** ("get the plantain price down"), because practising real tasks builds conversation faster than open chat.
+
+Each reply includes:
+
+- the partner's next message in Lingala (tap it for the English);
+- feedback on *your* last message: ✓ natural, 👍 a more natural phrasing, or 💡 a correction, with a one-line explanation;
+- two or three suggested replies at your level, if you're stuck;
+- a check on whether you've completed the mission (+10 XP; each message is +2 XP).
+
+The partner is pitched at your level. The Worker reads the phrases you've learned from D1 and tells the model to build on them, adding at most one or two new words per message.
+
+**How it works:** `POST /api/chat` ([`src/chat.js`](src/chat.js)) calls the Claude API (`claude-opus-5-5`, low effort for quick replies) with a JSON-schema output format, so every reply arrives in the same structure. Server-side refusal fallbacks are on (`fallbacks: "default"`). Scenarios live in [`public/app/js/chat-scenarios.js`](public/app/js/chat-scenarios.js).
+
+**Cost controls:** chat requires an account, is limited to 12 messages a minute per learner, and caps each learner at 150 messages a day (`DAILY_MESSAGE_CAP`). Failed calls don't count. Conversations are stored only on the learner's device and are cleared on sign-out.
+
+> Replies are AI-generated and can contain mistakes. The prompt tells the model to use only Lingala it is confident in and never to invent idioms, but learners should still check anything surprising with a native speaker.
 
 ## How the app teaches
 
@@ -57,8 +77,11 @@ public/            Static assets (Workers Static Assets, served from the edge ca
     js/lesson.js   Session builder: lessons, reviews, role-plays, checkpoints, pace
     js/player.js   Exercise UI
     js/store.js    Local state + server sync
+    js/chat.js     Live chat practice UI
+    js/chat-scenarios.js  Chat partners and missions (shared with the Worker)
     sw.js          Service worker (offline support, installable PWA)
 src/worker.js      API Worker: auth, sessions, progress sync
+src/chat.js        Chat endpoint: prompt, Claude API call, quotas
 migrations/        D1 schema
 tests/             Unit tests for the learning logic
 ```
@@ -67,7 +90,7 @@ tests/             Unit tests for the learning logic
 
 - **Workers + Static Assets**: the site and app are served from Cloudflare's edge. Only `/api/*` requests run the Worker (`run_worker_first`).
 - **D1** (`learn-lingala-db`): users, sessions, per-word review state, XP history.
-- **Workers Rate Limiting**: 10 sign-in/sign-up attempts per minute per IP, and 120 API calls per minute per IP.
+- **Workers Rate Limiting**: 10 sign-in/sign-up attempts per minute per IP, 120 API calls per minute per IP, and 12 chat messages per minute per learner.
 - **Turnstile** (optional): bot protection on sign-up and sign-in (see below).
 - **Workers Observability**: logs and traces in the dashboard.
 
@@ -87,9 +110,18 @@ npm run dev     # http://localhost:8787 (local D1 is created automatically)
 npm test        # unit tests for the scheduler, answer checking, and lesson builder
 ```
 
+To try chat locally, copy `.dev.vars.example` to `.dev.vars` and add a Claude API key.
+
 ## Deploy
 
 The `learn-lingala` Worker deploys from GitHub: every push to `main` runs `npx wrangler deploy`. The database schema is created automatically on the first request; to apply it by hand, run `npm run db:migrate`.
+
+### Turn on live chat
+
+1. Create an API key in the [Claude Console](https://platform.claude.com/) (set a monthly spend limit there too).
+2. Run `npx wrangler secret put ANTHROPIC_API_KEY` and paste the key, or add it in the Cloudflare dashboard under **Workers & Pages → learn-lingala → Settings → Variables and Secrets** as a *Secret*.
+
+Chat stays switched off, with a notice in the app, until the key is set. Nothing else needs to change.
 
 ### Optional: turn on Turnstile
 

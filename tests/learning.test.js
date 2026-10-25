@@ -181,3 +181,15 @@ test('exercise content: choices and tiles are valid for every item', () => {
     for (const w of normalize(item.lg).split(' ')) assert.ok(bank.includes(w), `${item.id} missing tile ${w}`);
   }
 });
+
+test('chat scenarios: unique, complete, and tied to real course levels', async () => {
+  const { SCENARIOS } = await import('../public/app/js/chat-scenarios.js');
+  const ids = SCENARIOS.map((s) => s.id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const s of SCENARIOS) {
+    assert.match(s.id, /^[a-z-]+$/);
+    assert.ok(s.partner && s.persona && s.setting && s.opener.lg && s.opener.en, s.id);
+    assert.ok(s.level === null || LEVELS.some((l) => l.id === s.level), `${s.id}: unknown level`);
+  }
+  assert.ok(SCENARIOS.filter((s) => s.mission).length >= 5, 'most partners come with a mission');
+});
