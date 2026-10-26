@@ -5,14 +5,18 @@ import initSql from '../migrations/0001_init.sql';
 import chatSql from '../migrations/0002_chat.sql';
 import settingsSql from '../migrations/0003_settings.sql';
 import studySql from '../migrations/0004_study.sql';
+import notifySql from '../migrations/0005_notify.sql';
 import { HttpError, json, readJson, checkOrigin, clientIp, getCookie, rateLimit } from './http.js';
 import { hashPassword, verifyPassword, burnPasswordCheck, newSessionToken, sha256Hex } from './crypto.js';
 import { chatTurn } from './chat.js';
 import { translate } from './translate.js';
 import { memoryHook } from './hook.js';
 import { ITEM_BY_ID } from '../public/app/js/course.js';
+import { emailEnabled, sendEmail, appUrl, verifyEmail, resetEmail } from './mail.js';
+import { smsEnabled } from './sms.js';
+import { getPrefs, updatePrefs, startPhone, verifyPhone, removePhone, unsubscribe, runScheduled } from './notify.js';
 
-const schemaSql = `${initSql}\n${chatSql}\n${settingsSql}\n${studySql}`;
+const schemaSql = `${initSql}\n${chatSql}\n${settingsSql}\n${studySql}\n${notifySql}`;
 const BASE_LANGS = ['en', 'fr'];
 
 const SESSION_COOKIE = 'll_session';
@@ -61,9 +65,11 @@ async function currentUser(request, env) {
   const token = getCookie(request, SESSION_COOKIE);
   if (!token) return null;
   return env.DB.prepare(
-    `SELECT u.id, u.email, u.display_name, u.daily_goal, u.password_hash, s.token_hash, us.base_lang
+    `SELECT u.id, u.email, u.display_name, u.daily_goal, u.password_hash, s.token_hash, us.base_lang,
+            a.email_verified_at, a.plan
        FROM sessions s JOIN users u ON u.id = s.user_id
        LEFT JOIN user_settings us ON us.user_id = u.id
+       LEFT JOIN account_status a ON a.user_id = u.id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
   )
     .bind(await sha256Hex(token), Date.now())
@@ -77,7 +83,15 @@ async function requireUser(request, env) {
 }
 
 function publicUser(u) {
-  return { id: u.id, email: u.email, displayName: u.display_name, dailyGoal: u.daily_goal, baseLang: u.base_lang || null };
+  return {
+    id: u.id,
+    email: u.email,
+    displayName: u.display_name,
+    dailyGoal: u.daily_goal,
+    baseLang: u.base_lang || null,
+    emailVerified: !!u.email_verified_at,
+    plan: u.plan || 'free',
+  };
 }
 
 const cleanBaseLang = (v) => (BASE_LANGS.includes(v) ? v : null);
@@ -190,7 +204,10 @@ async function signup(request, env, url) {
       'INSERT INTO users (id, email, password_hash, display_name, daily_goal, created_at) VALUES (?, ?, ?, ?, ?, ?)',
     ).bind(user.id, email, await hashPassword(password), user.display_name, user.daily_goal, Date.now()),
     env.DB.prepare('INSERT INTO user_settings (user_id, base_lang) VALUES (?, ?)').bind(user.id, user.base_lang),
+    env.DB.prepare("INSERT INTO account_status (user_id, plan) VALUES (?, 'free')").bind(user.id),
   ]);
+  // Best effort: the account works without it, and the profile offers to resend.
+  await sendVerification(env, url, user).catch(() => {});
 
   return json({ user: publicUser(user) }, 201, { 'Set-Cookie': await startSession(env, url, user.id) });
 }
@@ -204,7 +221,10 @@ async function login(request, env, url) {
   await verifyTurnstile(env, body.turnstileToken, ip);
 
   const user = await env.DB.prepare(
-    'SELECT u.*, us.base_lang FROM users u LEFT JOIN user_settings us ON us.user_id = u.id WHERE u.email = ?',
+    `SELECT u.*, us.base_lang, a.email_verified_at, a.plan FROM users u
+       LEFT JOIN user_settings us ON us.user_id = u.id
+       LEFT JOIN account_status a ON a.user_id = u.id
+      WHERE u.email = ?`,
   )
     .bind(email)
     .first();
@@ -219,6 +239,107 @@ async function login(request, env, url) {
   await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND expires_at <= ?').bind(user.id, Date.now()).run();
 
   return json({ user: publicUser(user) }, 200, { 'Set-Cookie': await startSession(env, url, user.id) });
+}
+
+// --- Email verification and password reset ----------------------------------------
+
+const TOKEN_TTL = { verify: 7 * DAY_MS, reset: 60 * 60_000 };
+
+async function issueEmailToken(env, userId, purpose) {
+  const token = newSessionToken();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM email_tokens WHERE user_id = ? AND purpose = ?').bind(userId, purpose),
+    env.DB.prepare('INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)').bind(
+      await sha256Hex(token),
+      userId,
+      purpose,
+      Date.now() + TOKEN_TTL[purpose],
+    ),
+  ]);
+  return token;
+}
+
+// Single use: the token is deleted whether or not it has expired.
+async function takeEmailToken(env, token, purpose) {
+  if (!token || token.length > 200) return null;
+  const hash = await sha256Hex(token);
+  const row = await env.DB.prepare('SELECT user_id, expires_at FROM email_tokens WHERE token_hash = ? AND purpose = ?').bind(hash, purpose).first();
+  if (!row) return null;
+  await env.DB.prepare('DELETE FROM email_tokens WHERE token_hash = ?').bind(hash).run();
+  return row.expires_at > Date.now() ? row.user_id : null;
+}
+
+const markVerified = (env, userId) =>
+  env.DB.prepare(
+    `INSERT INTO account_status (user_id, email_verified_at) VALUES (?, ?)
+     ON CONFLICT (user_id) DO UPDATE SET email_verified_at = COALESCE(account_status.email_verified_at, excluded.email_verified_at)`,
+  )
+    .bind(userId, Date.now())
+    .run();
+
+async function sendVerification(env, url, user) {
+  if (!emailEnabled(env)) return false;
+  const token = await issueEmailToken(env, user.id, 'verify');
+  const mail = verifyEmail(user.base_lang, `${appUrl(env, url)}/api/email/verify?token=${token}`);
+  await sendEmail(env, { to: user.email, ...mail });
+  return true;
+}
+
+// Link from the email: confirm, then open the profile.
+async function confirmEmail(env, url) {
+  const userId = await takeEmailToken(env, url.searchParams.get('token'), 'verify');
+  if (userId) await markVerified(env, userId);
+  return Response.redirect(`${url.origin}/app/#/account/${userId ? 'verified' : 'verify-failed'}`, 302);
+}
+
+async function resendVerification(request, env, url) {
+  const user = await requireUser(request, env);
+  await rateLimit(env.AUTH_LIMITER, `verify:${user.id}`);
+  if (user.email_verified_at) return json({ ok: true, alreadyVerified: true });
+  if (!emailEnabled(env)) throw new HttpError(503, 'email-off');
+  await sendVerification(env, url, user);
+  return json({ ok: true });
+}
+
+// Always answers the same way, so it can't be used to find out who has an account.
+async function forgotPassword(request, env, url) {
+  await rateLimit(env.AUTH_LIMITER, `auth:${clientIp(request)}`);
+  if (!emailEnabled(env)) throw new HttpError(503, 'email-off');
+  const body = await readJson(request);
+  const email = cleanEmail(body.email);
+  const user = await env.DB.prepare(
+    'SELECT u.id, u.email, us.base_lang FROM users u LEFT JOIN user_settings us ON us.user_id = u.id WHERE u.email = ?',
+  )
+    .bind(email)
+    .first();
+  if (user) {
+    const token = await issueEmailToken(env, user.id, 'reset');
+    // The token travels in the URL fragment, so it never reaches server logs.
+    await sendEmail(env, { to: user.email, ...resetEmail(user.base_lang, `${appUrl(env, url)}/app/#/reset/${token}`) }).catch(() => {});
+  }
+  return json({ ok: true });
+}
+
+async function resetPassword(request, env, url) {
+  await rateLimit(env.AUTH_LIMITER, `auth:${clientIp(request)}`);
+  const body = await readJson(request);
+  const password = cleanPassword(body.password);
+  const userId = await takeEmailToken(env, String(body.token || ''), 'reset');
+  if (!userId) throw new HttpError(400, 'reset-expired');
+  await env.DB.batch([
+    env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(await hashPassword(password), userId),
+    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId), // sign out everywhere else
+  ]);
+  await markVerified(env, userId); // they proved they can read this inbox
+  const user = await env.DB.prepare(
+    `SELECT u.*, us.base_lang, a.email_verified_at, a.plan FROM users u
+       LEFT JOIN user_settings us ON us.user_id = u.id
+       LEFT JOIN account_status a ON a.user_id = u.id
+      WHERE u.id = ?`,
+  )
+    .bind(userId)
+    .first();
+  return json({ user: publicUser(user) }, 200, { 'Set-Cookie': await startSession(env, url, userId) });
 }
 
 async function logout(request, env, url) {
@@ -259,6 +380,11 @@ async function deleteMe(request, env, url) {
     env.DB.prepare('DELETE FROM chat_usage WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM translate_usage WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM item_notes WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM email_tokens WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM notify_prefs WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM phone_codes WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM sms_usage WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM account_status WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM hook_usage WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM user_settings WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
@@ -359,7 +485,38 @@ async function handleApi(request, env, url) {
         turnstileSiteKey: env.TURNSTILE_SECRET_KEY ? env.TURNSTILE_SITE_KEY || null : null,
         chatEnabled: !!env.ANTHROPIC_API_KEY,
         aiEnabled: !!env.ANTHROPIC_API_KEY,
+        emailEnabled: emailEnabled(env),
+        smsEnabled: smsEnabled(env),
+        // Ad banner: Google AdSense when both are set, otherwise the app shows its own promos.
+        ads: env.ADSENSE_CLIENT && env.ADSENSE_SLOT ? { client: env.ADSENSE_CLIENT, slot: env.ADSENSE_SLOT } : null,
       });
+    case 'GET /api/email/verify':
+      return confirmEmail(env, url);
+    case 'POST /api/email/resend':
+      return resendVerification(request, env, url);
+    case 'GET /api/email/unsubscribe':
+    case 'POST /api/email/unsubscribe':
+      return unsubscribe(request, env, url);
+    case 'POST /api/auth/forgot':
+      return forgotPassword(request, env, url);
+    case 'POST /api/auth/reset':
+      return resetPassword(request, env, url);
+    case 'GET /api/notify':
+      return json(await getPrefs(env, await requireUser(request, env)));
+    case 'PATCH /api/notify':
+      return json(await updatePrefs(env, await requireUser(request, env), await readJson(request, 4 * 1024)));
+    case 'POST /api/phone/start': {
+      const user = await requireUser(request, env);
+      await rateLimit(env.AUTH_LIMITER, `phone:${user.id}`);
+      return json(await startPhone(env, user, await readJson(request, 4 * 1024)));
+    }
+    case 'POST /api/phone/verify': {
+      const user = await requireUser(request, env);
+      await rateLimit(env.AUTH_LIMITER, `phone:${user.id}`);
+      return json(await verifyPhone(env, user, await readJson(request, 4 * 1024)));
+    }
+    case 'POST /api/phone/remove':
+      return json(await removePhone(env, await requireUser(request, env)));
     case 'POST /api/chat': {
       const user = await requireUser(request, env);
       await rateLimit(env.CHAT_LIMITER, `chat:${user.id}`);
@@ -407,5 +564,11 @@ export default {
       console.error(err);
       return json({ error: 'Something went wrong on our side. Please try again.' }, 500);
     }
+  },
+
+  // Cron Trigger (every 15 minutes, see wrangler.jsonc): word-of-the-day emails and lesson reminders.
+  async scheduled(controller, env, ctx) {
+    if (!env.DB) return;
+    ctx.waitUntil(ensureSchema(env.DB).then(() => runScheduled(env, controller.scheduledTime || Date.now())));
   },
 };

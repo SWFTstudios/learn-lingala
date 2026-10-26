@@ -267,7 +267,9 @@ test('UI strings: every key used in the app exists in every language', () => {
   for (const g of [10, 20, 30, 50]) used.add(`goal.${g}`).add(`goal.name.${g}`);
   for (const m of ['travel', 'family', 'music', 'friends', 'work', 'curious']) used.add(`mot.${m}`).add(`mot.line.${m}`);
   for (const c of ['high', 'medium', 'low']) used.add(`tr.conf.${c}`);
-  for (const r of ['learn', 'unit', 'level', 'review', 'chat', 'translate', 'phrases', 'account', 'study', 'card']) used.add(`title.${r}`);
+  for (const r of ['learn', 'unit', 'level', 'review', 'chat', 'translate', 'phrases', 'account', 'study', 'card', 'forgot', 'reset']) used.add(`title.${r}`);
+  for (const c of ['off', 'email', 'sms']) used.add(`nt.ch.${c}`);
+  for (const e of ['email-off', 'sms-off', 'pro-only', 'phone-unverified', 'phone-invalid', 'code-wrong', 'code-expired', 'sms-quota', 'reset-expired', 'email-failed', 'sms-failed']) used.add(`nerr.${e}`);
   for (const d of ['due', 'weak', 'tricky', 'recent', 'all']) used.add(`study.deck.${d}`).add(`study.deckSub.${d}`);
   for (const f of ['ln', 'base', 'mix']) used.add(`study.front.${f}`);
   for (const c of ['none', 'think', 'sure']) used.add(`study.conf.${c}`);
@@ -333,4 +335,41 @@ test('study cards: look-alikes and conversation lines', () => {
   }
   const olei = ITEMS.find((i) => i.id === 'fd-olei');
   assert.ok(contextLines(olei).length > 0, 'Olei? appears in a course conversation');
+});
+
+test('reminders: next local time in a time zone, across daylight saving', async () => {
+  const { nextOccurrence, localDate, validClock, validTimeZone } = await import('../src/time.js');
+  // 2026-03-07 12:00 UTC = 07:00 in New York (EST, UTC-5).
+  const before = Date.UTC(2026, 2, 7, 12, 0);
+  assert.equal(new Date(nextOccurrence('19:00', 'America/New_York', before)).toISOString(), '2026-03-08T00:00:00.000Z');
+  // After 19:00 local it rolls to the next day; New York switches to EDT (UTC-4) on 2026-03-08.
+  const after = Date.UTC(2026, 2, 8, 1, 0);
+  assert.equal(new Date(nextOccurrence('19:00', 'America/New_York', after)).toISOString(), '2026-03-08T23:00:00.000Z');
+  assert.equal(new Date(nextOccurrence('08:00', 'Africa/Kinshasa', Date.UTC(2026, 0, 1, 6, 59))).toISOString(), '2026-01-01T07:00:00.000Z');
+  assert.equal(localDate('Africa/Kinshasa', Date.UTC(2026, 0, 1, 23, 30)), '2026-01-02');
+  assert.ok(validClock('07:45') && !validClock('07:40') && !validClock('24:00'));
+  assert.ok(validTimeZone('Europe/Paris') && !validTimeZone('Mars/Base'));
+});
+
+test('word of the day: same phrase for a given date, cycles through the whole course', async () => {
+  const { wordOfTheDay } = await import('../public/app/js/wotd.js');
+  assert.equal(wordOfTheDay('2026-10-26').id, wordOfTheDay('2026-10-26').id);
+  const seen = new Set();
+  const start = Date.parse('2026-01-01T00:00:00Z');
+  for (let i = 0; i < ITEMS.length; i++) seen.add(wordOfTheDay(new Date(start + i * 86_400_000).toISOString().slice(0, 10)).id);
+  assert.equal(seen.size, ITEMS.length);
+});
+
+test('emails: templates in both languages include the link and unsubscribe', async () => {
+  const { verifyEmail, resetEmail, wotdEmail, reminderEmail, unsubHeaders } = await import('../src/mail.js');
+  for (const lang of ['en', 'fr']) {
+    const v = verifyEmail(lang, 'https://x.test/api/email/verify?token=abc');
+    assert.ok(v.html.includes('token=abc') && v.text.includes('token=abc') && v.subject);
+    assert.ok(resetEmail(lang, 'https://x.test/app/#/reset/abc').html.includes('#/reset/abc'));
+    const w = wotdEmail(lang, ITEMS.find((i) => i.id === 'w-nalingi-yo'), { base: 'https://x.test', unsubUrl: 'https://x.test/u' });
+    assert.ok(w.subject.includes('Nalingi yo') && w.html.includes('#/card/w-nalingi-yo') && w.html.includes('https://x.test/u'));
+    const r = reminderEmail(lang, { streak: 4, due: 3, base: 'https://x.test', unsubUrl: 'https://x.test/u' });
+    assert.ok(r.html.includes('4') && r.text.includes('https://x.test/u'));
+  }
+  assert.equal(unsubHeaders('https://x.test/u')['List-Unsubscribe'], '<https://x.test/u>');
 });
