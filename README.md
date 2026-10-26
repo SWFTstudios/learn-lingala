@@ -50,9 +50,9 @@ Each reply includes:
 
 The partner is pitched at your level. The Worker reads the phrases you've learned from D1 and tells the model to build on them, adding at most one or two new words per message.
 
-**How it works:** `POST /api/chat` ([`src/chat.js`](src/chat.js)) calls the Claude API (`claude-opus-5-5`, low effort for quick replies) with a JSON-schema output format, so every reply arrives in the same structure. Server-side refusal fallbacks are on (`fallbacks: "default"`). Scenarios live in [`public/app/js/chat-scenarios.js`](public/app/js/chat-scenarios.js).
+**How it works:** `POST /api/chat` ([`src/chat.js`](src/chat.js)) calls the Claude API (`claude-sonnet-5-5`, low effort for quick replies) with a JSON-schema output format, so every reply arrives in the same structure. Server-side refusal fallbacks are on (`fallbacks: "default"`). Scenarios live in [`public/app/js/chat-scenarios.js`](public/app/js/chat-scenarios.js).
 
-**Translation** (`POST /api/translate`, [`src/translate.js`](src/translate.js)) uses the same model and safeguards, capped at 200 translations per learner per day.
+**Translation** (`POST /api/translate`, [`src/translate.js`](src/translate.js)) uses `claude-opus-5-5` with the same safeguards, capped at 200 translations per learner per day.
 
 **Cost controls:** chat requires an account, is limited to 12 messages a minute per learner, and caps each learner at 150 messages a day (`DAILY_MESSAGE_CAP`). Failed calls don't count. Conversations are stored only on the learner's device and are cleared on sign-out.
 

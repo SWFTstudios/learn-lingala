@@ -4,7 +4,7 @@
 import { ITEMS, LEVELS } from '../public/app/js/course.js';
 import { SCENARIO_BY_ID } from '../public/app/js/chat-scenarios.js';
 import { HttpError } from './http.js';
-import { claudeJson, takeDailyQuota, BASE_LANGUAGE_NAMES } from './claude.js';
+import { claudeJson, takeDailyQuota, BASE_LANGUAGE_NAMES, CHAT_MODEL } from './claude.js';
 
 export const DAILY_MESSAGE_CAP = 150;
 const MAX_HISTORY = 24; // messages sent to the model (most recent)
@@ -132,6 +132,7 @@ export async function chatTurn(env, user, body) {
   const { level, known } = await learnerProfile(env.DB, user.id);
 
   const reply = await claudeJson(env, {
+    model: CHAT_MODEL,
     system: [
       { type: 'text', text: BASE_PROMPT },
       { type: 'text', text: scenarioPrompt(scenario) },

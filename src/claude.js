@@ -4,7 +4,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { HttpError } from './http.js';
 
-export const MODEL = 'claude-opus-5-5';
+// Chat practice runs on Sonnet (a reply every few seconds, so cost per message
+// matters most there); translation stays on Opus.
+export const CHAT_MODEL = 'claude-sonnet-5-5';
+export const TRANSLATE_MODEL = 'claude-opus-5-5';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -33,12 +36,12 @@ export async function takeDailyQuota(db, table, userId, cap, message) {
 export const BASE_LANGUAGE_NAMES = { en: 'English', fr: 'French' };
 
 // One Claude call that must return JSON matching `schema`.
-export async function claudeJson(env, { system, messages, schema, refund }) {
+export async function claudeJson(env, { model, system, messages, schema, refund }) {
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, baseURL: env.ANTHROPIC_BASE_URL || undefined });
   let response;
   try {
     response = await client.beta.messages.create({
-      model: MODEL,
+      model,
       max_tokens: 16000,
       // Re-run on Anthropic's recommended model if a safety classifier declines a benign request.
       betas: ['server-side-fallback-2026-07-01'],
