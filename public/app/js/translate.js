@@ -8,7 +8,7 @@ import { normalize } from './answer.js';
 import { api } from './api.js';
 import * as store from './store.js';
 import { t, getLang, gloss, langName, langInText, unitText, aiError, LANGS } from './i18n.js';
-import { icon } from './icons.js';
+import { icon, unitIcon } from './icons.js';
 
 const RECENT_KEY = 'll-recent-translations';
 const esc = (s) =>
@@ -101,7 +101,7 @@ function phraseList() {
         (!q || normalize(i.lg).includes(q) || normalize(gloss(i)).includes(q)),
     );
     return rows.length
-      ? `<h3 class="dict-group">${u.emoji} ${esc(unitText(u).title)}</h3><ul class="dict-list">${rows.map((i) => dictRow({ ...i, unit: u.id })).join('')}</ul>`
+      ? `<h3 class="dict-group">${unitIcon(u, 'sm')} ${esc(unitText(u).title)}</h3><ul class="dict-list">${rows.map((i) => dictRow({ ...i, unit: u.id })).join('')}</ul>`
       : '';
   }).join('');
   return groups || `<p class="muted">${t('phr.none')}</p>`;

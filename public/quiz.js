@@ -169,7 +169,7 @@ function initQuiz(root) {
     const msg = document.createElement('p');
     msg.textContent =
       score === questions.length
-        ? 'Malamu mingi! Perfect score! 🎉'
+        ? 'Malamu mingi! Perfect score!'
         : score >= questions.length / 2
           ? 'Malamu! Nice work — review the lesson and try again for a perfect score.'
           : 'Keep going! Re-read the lesson above and try again.';

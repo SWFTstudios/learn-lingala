@@ -89,7 +89,7 @@ export const UNITS = [
   // ───────────────────────────── Level 1 · Arrive ─────────────────────────────
   {
     id: 'greetings',
-    emoji: '👋',
+    icon: 'wave',
     title: 'Greetings',
     lg: 'Mbote!',
     intro: `
@@ -136,7 +136,7 @@ export const UNITS = [
   },
   {
     id: 'survival',
-    emoji: '🆘',
+    icon: 'lifebuoy',
     title: 'Survival phrases',
     lg: 'Likambo te',
     intro: `
@@ -176,7 +176,7 @@ export const UNITS = [
   },
   {
     id: 'pronouns',
-    emoji: '🧑🏾‍🤝‍🧑🏾',
+    icon: 'people',
     title: 'Me & you',
     lg: 'Ngai na yo',
     intro: `
@@ -218,7 +218,7 @@ export const UNITS = [
   },
   {
     id: 'numbers',
-    emoji: '💰',
+    icon: 'coins',
     title: 'Numbers & money',
     lg: 'Ntalo boni?',
     intro: `
@@ -265,7 +265,7 @@ export const UNITS = [
   // ─────────────────────────── Level 2 · Get around ───────────────────────────
   {
     id: 'food',
-    emoji: '🍲',
+    icon: 'bowl',
     title: 'Food & drink',
     lg: 'Bilei',
     intro: `
@@ -305,7 +305,7 @@ export const UNITS = [
   },
   {
     id: 'getting-around',
-    emoji: '🚕',
+    icon: 'car',
     title: 'Getting around',
     lg: 'Tokende!',
     intro: `
@@ -345,7 +345,7 @@ export const UNITS = [
   },
   {
     id: 'time-places',
-    emoji: '🗺️',
+    icon: 'pin',
     title: 'Time & places',
     lg: 'Lɛlɔ́ na lóbi',
     intro: `
@@ -372,7 +372,7 @@ export const UNITS = [
   },
   {
     id: 'questions',
-    emoji: '❓',
+    icon: 'question',
     title: 'Questions',
     lg: 'Nini? Wapi?',
     intro: `
@@ -409,7 +409,7 @@ export const UNITS = [
   // ─────────────────────────── Level 3 · Daily life ───────────────────────────
   {
     id: 'family',
-    emoji: '👨‍👩‍👧',
+    icon: 'home',
     title: 'Family & people',
     lg: 'Libota',
     intro: `
@@ -439,7 +439,7 @@ export const UNITS = [
   },
   {
     id: 'verbs',
-    emoji: '⚡',
+    icon: 'bolt',
     title: 'Action verbs',
     lg: 'Nazali kosala',
     intro: `
@@ -471,7 +471,7 @@ export const UNITS = [
   },
   {
     id: 'wants',
-    emoji: '💬',
+    icon: 'star',
     title: 'Wants, can & "not"',
     lg: 'Nalingi',
     intro: `
@@ -495,7 +495,7 @@ export const UNITS = [
   },
   {
     id: 'feelings',
-    emoji: '❤️',
+    icon: 'heart',
     title: 'Feelings',
     lg: 'Nazali na esengo',
     intro: `
@@ -519,7 +519,7 @@ export const UNITS = [
   // ───────────────────────── Level 4 · Conversations ──────────────────────────
   {
     id: 'tenses',
-    emoji: '⏳',
+    icon: 'hourglass',
     title: 'Past, present & future',
     lg: 'Nasalaki, nakosala',
     intro: `
@@ -547,7 +547,7 @@ export const UNITS = [
   },
   {
     id: 'about-me',
-    emoji: '🌍',
+    icon: 'idcard',
     title: 'About you',
     lg: 'Outi wapi?',
     intro: `
@@ -583,7 +583,7 @@ export const UNITS = [
   },
   {
     id: 'plans',
-    emoji: '📅',
+    icon: 'calendar',
     title: 'Plans & invitations',
     lg: 'Tokende elongo',
     intro: `
@@ -617,7 +617,7 @@ export const UNITS = [
   // ────────────────────────── Level 5 · Mwana mboka ───────────────────────────
   {
     id: 'reactions',
-    emoji: '😮',
+    icon: 'smile',
     title: 'Reactions & fillers',
     lg: 'Ya solo?',
     intro: `
@@ -641,7 +641,7 @@ export const UNITS = [
   },
   {
     id: 'street',
-    emoji: '🏙️',
+    icon: 'city',
     title: 'Kinshasa street talk',
     lg: 'Kin la belle',
     intro: `
@@ -676,7 +676,7 @@ export const UNITS = [
   },
   {
     id: 'respect',
-    emoji: '🙏🏾',
+    icon: 'sun',
     title: 'Respect & blessings',
     lg: 'Bozali malamu?',
     intro: `

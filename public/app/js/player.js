@@ -7,7 +7,7 @@ import { choices, replyChoices, tiles, acceptedAnswers, shuffle, CHECKPOINT_PASS
 import { schedule, newCard, isLearned } from './srs.js';
 import { getCard, putCards, addXp } from './store.js';
 import { t, gloss, itemNote, itemTip, unitText, dialogueText, drillText } from './i18n.js';
-import { icon } from './icons.js';
+import { icon, unitIcon } from './icons.js';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -172,7 +172,7 @@ function notesStep(step) {
     auto: true,
     html: `
       ${label(t('ex.newUnit', { title: esc(text.title) }))}
-      <h2 class="ex-title"><span class="ex-title-emoji">${unit.emoji}</span> <span lang="ln">${esc(unit.lg)}</span></h2>
+      <h2 class="ex-title">${unitIcon(unit)} <span lang="ln">${esc(unit.lg)}</span></h2>
       <div class="notes">${text.intro}</div>`,
   };
 }

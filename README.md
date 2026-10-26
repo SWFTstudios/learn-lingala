@@ -34,7 +34,7 @@ A premium, app-like interface on every screen size:
 - **Phones:** sticky top bar with streak and XP, bottom tab bar (Learn, Review, Chat, Translate, Profile), full-screen lessons with a thumb-reachable answer bar.
 - **Desktop:** sidebar navigation, a centred content column, and a right panel with the daily-goal ring, streak week and the 5-level path.
 - Type: **Unbounded** for headlines, numbers and the wordmark, **Onest** for everything else. Both are self-hosted variable fonts, and both include ɛ, ɔ and correctly placed tone marks (few fonts do: check any replacement with the Lingala test phrase *Matɔ́ndɔ mingi*).
-- Colour: crisp cool neutrals, an emerald brand colour, an electric-lime accent on deep-green "stage" panels (landing hero, the app's Continue card, chat), gold for streaks. A custom SVG icon set, light and dark modes, and reduced-motion support.
+- Colour: crisp cool neutrals, an emerald brand colour, an electric-lime accent on deep-green "stage" panels (landing hero, the app's Continue card, chat), gold for streaks. A custom SVG icon set (each course unit has its own icon on a tile tinted by level; emoji are kept only for the chat partners' avatars), light and dark modes, and reduced-motion support.
 - **Onboarding:** pick your language, why you're learning, a daily goal, and whether to start from zero or test out of Level 1.
 
 ## Offline & install

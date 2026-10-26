@@ -12,7 +12,7 @@ import * as store from './store.js';
 import { chatPickerHtml, mountChat, isScenario, clearChats } from './chat.js';
 import { translateHtml, wireTranslate, clearRecent } from './translate.js';
 import { t, tn, setLang, getLang, LANGS, gloss, unitText, levelText, dialogueText } from './i18n.js';
-import { icon } from './icons.js';
+import { icon, unitIcon } from './icons.js';
 import { installCardHtml, installSettingsHtml, promptInstall, dismissInstall, onInstallChange, initOfflineBanner } from './pwa.js';
 
 const app = document.getElementById('app');
@@ -21,6 +21,7 @@ const esc = (s) =>
 
 const CONVERSATIONAL = 'conversations'; // the level that marks "conversational"
 const MOTIVATIONS = ['travel', 'family', 'music', 'friends', 'work', 'curious'];
+const MOTIVATION_ICONS = { travel: 'plane', family: 'home', music: 'music', friends: 'heart', work: 'briefcase', curious: 'compass' };
 const GOALS = [10, 20, 30, 50];
 
 let config = { turnstileSiteKey: null, aiEnabled: null }; // null = still loading
@@ -188,7 +189,7 @@ function unitRow(un, isCurrent) {
   const text = unitText(un);
   return `
     <a href="#/unit/${un.id}" class="unit-row ${p.done ? 'done' : ''} ${isCurrent ? 'current' : ''}">
-      ${ring(p.learned / p.total, 52, 5, `<span class="unit-emoji">${un.emoji}</span>`)}
+      ${ring(p.learned / p.total, 52, 5, unitIcon(un, 'in-ring'))}
       <span class="unit-text">
         <span class="unit-title">${esc(text.title)} ${isCurrent ? `<span class="badge badge-next">${t('home.upNext')}</span>` : ''}</span>
         <span class="unit-sub"><span lang="ln">${esc(un.lg)}</span>${un.dialogue ? ` · ${icon('chat')}` : ''}</span>
@@ -241,7 +242,7 @@ function homeScreen() {
     </div>
 
     <a href="#/lesson/${unit.id}" class="hero">
-      <span class="hero-art" aria-hidden="true">${unit.emoji}</span>
+      <span class="hero-art" aria-hidden="true">${icon(unit.icon)}</span>
       <span class="hero-body">
         <span class="hero-kicker">${prog.done ? t('home.practice') : learned ? t('home.continue') : t('home.start')} · ${t('home.level', { n: levelNumber(level) })}</span>
         <span class="hero-title">${esc(unitText(unit).title)}</span>
@@ -356,7 +357,7 @@ function unitScreen(id) {
     `
     <a href="#/level/${level.id}" class="back">${icon('back')} ${t('home.level', { n: levelNumber(level) })} · ${esc(levelText(level).title)}</a>
     <header class="page-head unit-head">
-      <span class="unit-hero-emoji" aria-hidden="true">${unit.emoji}</span>
+      ${unitIcon(unit, 'lg')}
       <div>
         <h1>${esc(text.title)}</h1>
         <p class="lede"><span lang="ln">${esc(unit.lg)}</span> · ${t('home.learnedOf', { n: p.learned, total: p.total })}</p>
@@ -426,7 +427,7 @@ function reviewScreen() {
       talkable.length
         ? `<h2 class="section-title">${t('review.conversations')}</h2>
            <div class="units">${talkable
-             .map((u) => `<a href="#/talk/${u.id}" class="unit-row"><span class="unit-emoji solo">${u.emoji}</span>
+             .map((u) => `<a href="#/talk/${u.id}" class="unit-row">${unitIcon(u)}
                <span class="unit-text"><span class="unit-title">${esc(dialogueText(u).title)}</span>
                <span class="unit-sub">${esc(unitText(u).title)}</span></span><span class="unit-count">${icon('forward')}</span></a>`)
              .join('')}</div>`
@@ -571,7 +572,7 @@ function onboardingScreen() {
       <div class="ob-options grid-2">
         ${MOTIVATIONS.map(
           (m) => `<button type="button" class="ob-option ${ob.motivation === m ? 'selected' : ''}" data-why="${m}">
-            <span class="ob-flag">${t(`mot.icon.${m}`)}</span><span><b>${t(`mot.${m}`)}</b></span></button>`,
+            <span class="ob-flag">${icon(MOTIVATION_ICONS[m])}</span><span><b>${t(`mot.${m}`)}</b></span></button>`,
         ).join('')}
       </div>`,
     goal: `

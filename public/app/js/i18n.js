@@ -90,7 +90,6 @@ const STRINGS = {
     'ob.whyTitle': 'Why are you learning Lingala?', 'ob.whySub': 'We’ll keep your goal in mind.',
     'mot.travel': 'Travelling to Congo', 'mot.family': 'Family & heritage', 'mot.music': 'Music & culture',
     'mot.friends': 'Friends or partner', 'mot.work': 'Work', 'mot.curious': 'Just curious',
-    'mot.icon.travel': '✈️', 'mot.icon.family': '👨‍👩‍👧', 'mot.icon.music': '🎶', 'mot.icon.friends': '❤️', 'mot.icon.work': '💼', 'mot.icon.curious': '✨',
     'ob.goalTitle': 'Pick a daily goal', 'ob.goalSub': 'Consistency beats intensity. You can change this any time.',
     'ob.goalPace': 'At this pace you’ll finish Level 4 · Conversations {when}.',
     'ob.levelTitle': 'How much Lingala do you know?', 'ob.levelSub': 'Already know some? Take a quick test and skip ahead.',

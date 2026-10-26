@@ -8,6 +8,7 @@ import {
   buildLesson, buildDueReview, buildConversation, buildCheckpoint, choices, replyChoices, tiles,
   currentUnit, reviewStepFor, daysToLevel, NEW_PER_LESSON,
 } from '../public/app/js/lesson.js';
+import { hasIcon } from '../public/app/js/icons.js';
 
 const noFuzz = () => 0.5;
 const learnedCard = (id, now) => ({ ...newCard(id, now), reps: 2, interval: 3, last: now - 4 * DAY, due: now - DAY });
@@ -262,7 +263,7 @@ test('UI strings: every key used in the app exists in every language', () => {
   // Keys built at runtime.
   for (const k of ['learn', 'review', 'chat', 'translate', 'account']) used.add(`nav.${k}`);
   for (const g of [10, 20, 30, 50]) used.add(`goal.${g}`).add(`goal.name.${g}`);
-  for (const m of ['travel', 'family', 'music', 'friends', 'work', 'curious']) used.add(`mot.${m}`).add(`mot.line.${m}`).add(`mot.icon.${m}`);
+  for (const m of ['travel', 'family', 'music', 'friends', 'work', 'curious']) used.add(`mot.${m}`).add(`mot.line.${m}`);
   for (const c of ['high', 'medium', 'low']) used.add(`tr.conf.${c}`);
   for (const r of ['learn', 'unit', 'level', 'review', 'chat', 'translate', 'phrases', 'account']) used.add(`title.${r}`);
   for (const e of ['busy', 'unavailable', 'connection', 'refused', 'muddled', 'quota', 'too-long', 'off']) used.add(`aiErr.${e}`);
@@ -270,8 +271,11 @@ test('UI strings: every key used in the app exists in every language', () => {
   for (const key of used) assert.ok(hasKey(key, 'en'), `missing English string ${key}`);
   for (const lang of Object.keys(LANGS)) {
     for (const key of stringKeys('en')) {
-      if (key.startsWith('mot.icon.')) continue; // emoji, shared
       assert.ok(hasKey(key, lang), `missing ${lang} string ${key}`);
     }
   }
+});
+
+test('every unit has an icon from the icon set', () => {
+  for (const unit of COURSE) assert.ok(unit.icon && hasIcon(unit.icon), `unit ${unit.id} has no valid icon`);
 });
