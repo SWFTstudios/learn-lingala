@@ -3,7 +3,8 @@
 Learn Lingala at any level: a free, mobile-first learning app built on Cloudflare.
 
 - **`/app/`** is the learning app: bite-sized lessons, spaced-repetition reviews, streaks, accounts and progress sync.
-- **`/`** is the landing page, plus reference guides for the [alphabet](public/alphabet.html) and [sentence structure](public/sentences.html).
+- **`/`** is the marketing landing page ([`index.html`](public/index.html), `landing.css`, `landing.js`): who it's for, how it works, features, the 5-level path, a comparison, FAQ and a live sentence builder. Every call to action opens the app (returning learners see "Continue learning").
+- **`/alphabet`** and **`/sentences`** are free reference guides.
 
 ## The path to conversational
 
