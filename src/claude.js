@@ -12,7 +12,7 @@ export const TRANSLATE_MODEL = 'claude-opus-5-5';
 const today = () => new Date().toISOString().slice(0, 10);
 
 // Quota tables are fixed names from this file, never user input.
-const QUOTA_TABLES = new Set(['chat_usage', 'translate_usage', 'hook_usage']);
+const QUOTA_TABLES = new Set(['chat_usage', 'translate_usage', 'hook_usage', 'sms_usage']);
 
 // Counts today's use of a feature and refuses once the daily cap is reached.
 export async function takeDailyQuota(db, table, userId, cap, message) {

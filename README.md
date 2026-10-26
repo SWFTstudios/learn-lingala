@@ -72,6 +72,33 @@ What makes them different, and the research behind each part:
 
 Every rating feeds the same spaced-repetition schedule as lessons and reviews.
 
+## Email, reminders & word of the day
+
+Signed-in learners manage these in **Profile → Email & reminders**:
+
+- **Email confirmation:** a link is emailed at sign-up (and can be resent). Word-of-the-day emails, email reminders and password resets need a confirmed address.
+- **Forgot password:** "Forgot password?" on the sign-in screen emails a one-hour, single-use reset link. Resetting signs the account out on every other device. The answer is the same whether or not the address has an account.
+- **Word of the day:** one phrase every morning at 8:00 local time, with its word-by-word breakdown and a link to its study card. The same phrase is on the app's home screen ([`wotd.js`](public/app/js/wotd.js)).
+- **Tips & news:** an opt-in that is recorded for future newsletters (nothing sends it yet).
+- **Lesson reminders:** by email, or by **text for Pro members**, at a time the learner picks (15-minute steps, in their own time zone, detected from the device). By default, no reminder on days they've already practised.
+- **Text reminders (Pro):** the learner confirms their mobile number with a 6-digit code first. Max 8 texts per learner per day. Twilio handles STOP replies.
+- Every email has a working unsubscribe link and one-click `List-Unsubscribe` headers (required by Gmail and Yahoo).
+
+A Cron Trigger runs every 15 minutes ([`src/notify.js`](src/notify.js)) and sends whatever is due. Each learner's next send time is stored in UTC and recalculated after each send, so daylight-saving changes are handled.
+
+**Pro plan:** the `plan` column of `account_status` (`free` or `pro`). There's no checkout yet; Pro members get text reminders and no ad banner. To make someone Pro:
+
+```bash
+npx wrangler d1 execute learn-lingala-db --remote --command \
+  "UPDATE account_status SET plan = 'pro' WHERE user_id = (SELECT id FROM users WHERE email = 'someone@example.com')"
+```
+
+Learners can join a **Pro waitlist** from their profile (`notify_prefs.pro_waitlist`).
+
+## Ad banner
+
+The Home and Translate screens have a reserved, labelled banner space. It never appears in lessons, chat or study sessions, and never for Pro members. Until an ad network is connected it shows the app's own promos (word-of-the-day emails, the Pro waitlist), so the space is never empty.
+
 ## Live chat practice
 
 The **Chat** tab is a text conversation with a Lingala speaker in character: Mama Nzeba the neighbour, a market seller, a taxi driver, a cousin, a friend from Matonge, a respected elder, or open conversation. Most partners come with a **mission** ("get the plantain price down"), because practising real tasks builds conversation faster than open chat.
@@ -136,12 +163,19 @@ public/            Static assets (Workers Static Assets, served from the edge ca
     js/pwa.js      Offline banner and install prompt
     js/study.js    Study cards: decks, sessions, card back, notes
     js/breakdown.js  Word-by-word lexicon (English, French) and verb analyser
+    js/notify.js   Profile → Email & reminders
+    js/ads.js      Banner space (AdSense or house promos)
+    js/wotd.js     Word of the day (shared with the Worker)
     fonts/         Self-hosted Onest + Unbounded (SIL Open Font License)
     sw.js          Service worker (offline support, installable PWA)
 src/worker.js      API Worker: auth, sessions, progress sync
 src/chat.js        Chat endpoint: prompt and conversation rules
 src/translate.js   Translate endpoint
 src/hook.js        Memory hooks for study cards
+src/mail.js        Email sending (Cloudflare Email Service) and email templates (EN/FR)
+src/notify.js      Reminder and newsletter preferences, phone codes, unsubscribe, the scheduled job
+src/sms.js         Text messages (Twilio)
+src/time.js        Time-zone maths for scheduled sends
 src/claude.js      Shared Claude API call: JSON output, refusal fallbacks, errors, daily quotas
 migrations/        D1 schema
 tests/             Unit tests for the learning logic
@@ -184,6 +218,29 @@ The `learn-lingala` Worker deploys from GitHub: every push to `main` runs `npx w
 
 Chat stays switched off, with a notice in the app, until the key is set. Nothing else needs to change.
 
+### Turn on email (Cloudflare Email Service)
+
+Needs a domain on Cloudflare DNS and the Workers Paid plan (sending to any address is a paid feature).
+
+1. Cloudflare dashboard → **Compute → Email Service → Email Sending → Onboard Domain**, and pick your domain. Cloudflare adds the SPF, DKIM and DMARC records.
+2. In `wrangler.jsonc`, set `EMAIL_FROM` (for example `"Learn Lingala <hello@yourdomain.com>"`), and set `APP_URL` to the address people use (it's in links inside emails and texts).
+3. Deploy. The `send_email` binding (`EMAIL`) and the 15-minute Cron Trigger are already in `wrangler.jsonc`.
+
+Email features stay hidden until `EMAIL_FROM` is set. Locally, `wrangler dev` simulates sending: it logs each email and saves it to a file.
+
+### Turn on text reminders (Twilio, Pro)
+
+1. In Twilio, buy a number (or create a Messaging Service). Register it for A2P 10DLC if you'll text US numbers.
+2. Set `TWILIO_FROM` in `wrangler.jsonc` to the number (`+15551234567`) or the Messaging Service SID (`MG…`).
+3. Run `npx wrangler secret put TWILIO_ACCOUNT_SID` and `npx wrangler secret put TWILIO_AUTH_TOKEN`.
+
+### Turn on ads (Google AdSense)
+
+1. Get your site approved in AdSense and create a display ad unit.
+2. Set `ADSENSE_CLIENT` (`ca-pub-…`) and `ADSENSE_SLOT` (the ad unit ID) in `wrangler.jsonc`.
+3. Allow AdSense in the Content Security Policy in `public/_headers`. Add to `script-src`: `https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.gstatic.com https://*.adtrafficquality.google`. Add to `frame-src`: `https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google`. Change `img-src` to `'self' data: https:`. Add to `connect-src`: `https://*.google.com https://*.googlesyndication.com https://*.doubleclick.net https://*.adtrafficquality.google`.
+4. Add an `ads.txt` file to `public/` with the line AdSense gives you.
+
 ### Optional: turn on Turnstile
 
 1. Cloudflare dashboard → **Turnstile** → **Add widget** for your domain.
@@ -196,7 +253,6 @@ Turnstile stays off until the secret is set.
 
 - Native-speaker audio for every phrase (stored in R2): listening exercises and shadowing (repeating right after the speaker)
 - Record-and-compare speaking practice once reference audio exists
-- Password reset by email
 - More Level 4–5 content: storytelling, opinions, proverbs (*masese*), song lyrics
 - More base languages (Spanish, Portuguese, Swahili…): add a string table to `i18n.js` and a content layer like `course-fr.js`
 - Leaderboards and friend streaks

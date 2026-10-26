@@ -11,9 +11,12 @@ import { api } from './api.js';
 import * as store from './store.js';
 import { chatPickerHtml, mountChat, isScenario, clearChats } from './chat.js';
 import { translateHtml, wireTranslate, clearRecent } from './translate.js';
-import { t, tn, setLang, getLang, LANGS, gloss, unitText, levelText, dialogueText } from './i18n.js';
+import { t, tn, setLang, getLang, LANGS, gloss, unitText, levelText, dialogueText, notifyError } from './i18n.js';
 import { icon, unitIcon } from './icons.js';
 import { studyDecksHtml, wireStudyDecks, mountStudy, cardPageHtml, wireCardBody, deckItems } from './study.js';
+import { mountNotify } from './notify.js';
+import { adSlotHtml, fillAds } from './ads.js';
+import { wordOfTheDay } from './wotd.js';
 import { installCardHtml, installSettingsHtml, promptInstall, dismissInstall, onInstallChange, initOfflineBanner } from './pwa.js';
 
 const app = document.getElementById('app');
@@ -25,7 +28,7 @@ const MOTIVATIONS = ['travel', 'family', 'music', 'friends', 'work', 'curious'];
 const MOTIVATION_ICONS = { travel: 'plane', family: 'home', music: 'music', friends: 'heart', work: 'briefcase', curious: 'compass' };
 const GOALS = [10, 20, 30, 50];
 
-let config = { turnstileSiteKey: null, aiEnabled: null }; // null = still loading
+let config = { turnstileSiteKey: null, aiEnabled: null, emailEnabled: null, ads: null }; // null = still loading
 let stopSession = null;
 
 setLang(store.baseLang() || (navigator.language || '').slice(0, 2));
@@ -199,6 +202,19 @@ function unitRow(un, isCurrent) {
     </a>`;
 }
 
+// Today's phrase, the same one the word-of-the-day email sends.
+function wotdCard() {
+  const item = wordOfTheDay(store.today());
+  return `<div class="wotd">
+    <a href="#/card/${item.id}" class="wotd-main">
+      <span class="wotd-kicker">${icon('sparkle')} ${t('wotd.kicker')}</span>
+      <span class="wotd-lg" lang="ln">${esc(item.lg)}</span>
+      <span class="wotd-gloss">${esc(gloss(item))}</span>
+    </a>
+    ${config.emailEnabled ? `<a href="#/account" class="wotd-email">${icon('mail')} ${t('wotd.email')}</a>` : ''}
+  </div>`;
+}
+
 function homeScreen() {
   const unit = currentUnit(store.getCard);
   const prog = unitProgress(unit, store.getCard);
@@ -260,10 +276,14 @@ function homeScreen() {
         : ''
     }
 
+    ${wotdCard()}
+
     <div class="quick-grid">
       <a href="#/chat" class="quick quick-chat">${icon('chat')}<strong>${t('home.chatTitle')}</strong><small>${t('home.chatSub')}</small></a>
       <a href="#/translate" class="quick quick-tr">${icon('translate')}<strong>${t('home.trTitle')}</strong><small>${t('home.trSub')}</small></a>
     </div>
+
+    ${adSlotHtml('home', { ads: config.ads, user: u })}
 
     ${learned || u ? installCardHtml() : ''}
 
@@ -450,7 +470,8 @@ function reviewScreen() {
 const chatScreen = () =>
   shell('chat', chatPickerHtml({ aiEnabled: config.aiEnabled, signedIn: !!store.user(), currentLevelId: currentLevel().id }));
 
-const translateScreen = () => shell('translate', translateHtml({ aiEnabled: config.aiEnabled }));
+const translateScreen = () =>
+  shell('translate', translateHtml({ aiEnabled: config.aiEnabled }) + adSlotHtml('translate', { ads: config.ads, user: store.user() }));
 
 const cardScreen = (id) => {
   const html = cardPageHtml(id, { aiEnabled: config.aiEnabled, signedIn: !!store.user() });
@@ -481,8 +502,14 @@ function settingsHtml() {
     </section>`;
 }
 
-function accountScreen(mode = 'signup') {
+const verifyNotice = (arg) =>
+  arg === 'verified' ? `<p class="notice notice-ok">${icon('check')}<span>${t('verify.done')}</span></p>`
+  : arg === 'verify-failed' ? `<p class="notice">${icon('mail')}<span>${t('verify.failed')}</span></p>`
+  : '';
+
+function accountScreen(arg = 'signup') {
   const u = store.user();
+  const mode = arg === 'login' || ((arg === 'verified' || arg === 'verify-failed') && !u) ? 'login' : 'signup';
   if (u) {
     return shell(
       'account',
@@ -501,6 +528,7 @@ function accountScreen(mode = 'signup') {
         <div class="stat"><b>${store.totalXp()}</b><span>${t('stat.xp')}</span></div>
       </div>
       ${settingsHtml()}
+      <section class="card notify" id="notify-card" data-notice="${esc(arg)}"><p class="muted small">…</p></section>
       <button type="button" class="btn btn-secondary btn-block" id="signout">${icon('logout')} ${t('acct.signout')}</button>
       <details class="danger-zone">
         <summary>${t('acct.delete')}</summary>
@@ -518,6 +546,7 @@ function accountScreen(mode = 'signup') {
   return shell(
     'account',
     `
+    ${verifyNotice(arg)}
     <header class="page-head">
       <p class="eyebrow">${icon('lock')} ${t('acct.eyebrow')}</p>
       <h1>${signup ? t('acct.saveTitle') : t('acct.welcomeBack')}</h1>
@@ -536,9 +565,79 @@ function accountScreen(mode = 'signup') {
       <div id="turnstile"></div>
       <p class="form-error" role="alert"></p>
       <button class="btn btn-primary btn-block">${signup ? t('acct.create') : t('acct.signin')}</button>
+      ${!signup && config.emailEnabled !== false ? `<a href="#/forgot" class="forgot-link">${t('acct.forgot')}</a>` : ''}
     </form>
     ${settingsHtml()}`,
   );
+}
+
+// --- Password reset ------------------------------------------------------------------
+
+function forgotScreen() {
+  return shell(
+    'account',
+    `
+    <a href="#/account/login" class="back">${icon('back')} ${t('acct.signin')}</a>
+    <header class="page-head"><h1>${t('forgot.title')}</h1><p class="lede">${t('forgot.sub')}</p></header>
+    <form id="forgot-form" class="form card" novalidate>
+      <label>${t('acct.email')}<input type="email" name="email" required autocomplete="email" inputmode="email"></label>
+      <p class="form-error" role="alert"></p>
+      <button class="btn btn-primary btn-block">${icon('mail')} ${t('forgot.send')}</button>
+    </form>`,
+  );
+}
+
+function wireForgot() {
+  const form = document.getElementById('forgot-form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = form.email.value.trim();
+    const err = form.querySelector('.form-error');
+    const btn = form.querySelector('button');
+    btn.disabled = true;
+    err.textContent = '';
+    try {
+      await api('auth/forgot', { method: 'POST', body: { email } });
+      form.outerHTML = `<p class="notice notice-ok">${icon('mail')}<span>${t('forgot.sent', { email: esc(email) })}</span></p>`;
+    } catch (ex) {
+      err.textContent = notifyError(ex);
+      btn.disabled = false;
+    }
+  });
+}
+
+function resetScreen() {
+  return shell(
+    'account',
+    `
+    <header class="page-head"><h1>${t('reset.title')}</h1><p class="lede">${t('reset.sub')}</p></header>
+    <form id="reset-form" class="form card" novalidate>
+      <label>${t('reset.password')}<input type="password" name="password" required minlength="8" autocomplete="new-password">
+        <span class="muted small">${t('acct.passwordHint')}</span></label>
+      <p class="form-error" role="alert"></p>
+      <button class="btn btn-primary btn-block">${t('reset.save')}</button>
+    </form>`,
+  );
+}
+
+function wireReset(token) {
+  const form = document.getElementById('reset-form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = form.querySelector('.form-error');
+    const btn = form.querySelector('button');
+    btn.disabled = true;
+    err.textContent = '';
+    try {
+      const { user } = await api('auth/reset', { method: 'POST', body: { token, password: form.password.value } });
+      history.replaceState(null, '', '#/');
+      await store.signedIn(user).catch(() => {});
+      render();
+    } catch (ex) {
+      err.innerHTML = `${esc(notifyError(ex))} ${ex.message === 'reset-expired' ? `<a href="#/forgot">${t('forgot.send')}</a>` : ''}`;
+      btn.disabled = false;
+    }
+  });
 }
 
 // --- Onboarding -------------------------------------------------------------------
@@ -861,7 +960,7 @@ function render() {
     });
     return;
   }
-  if (needsOnboarding() && route !== 'account') {
+  if (needsOnboarding() && !['account', 'forgot', 'reset'].includes(route)) {
     document.body.classList.add('in-session');
     app.innerHTML = onboardingScreen();
     wireOnboarding();
@@ -874,11 +973,20 @@ function render() {
     : route === 'review' ? reviewScreen()
     : route === 'chat' ? chatScreen()
     : route === 'translate' || route === 'phrases' ? translateScreen()
-    : route === 'account' ? accountScreen(arg === 'login' ? 'login' : 'signup')
+    : route === 'account' ? accountScreen(arg)
+    : route === 'forgot' ? forgotScreen()
+    : route === 'reset' ? resetScreen()
     : route === 'card' ? cardScreen(arg)
     : homeScreen();
 
   if (route === 'account') wireAccount();
+  if (route === 'account' && store.user()) {
+    const card = document.getElementById('notify-card');
+    mountNotify(card, { notice: verifyNotice(card.dataset.notice) });
+  }
+  if (route === 'forgot') wireForgot();
+  if (route === 'reset') wireReset(arg);
+  fillAds(app, config.ads);
   if (route === 'translate' || route === 'phrases') wireTranslate(app, { rerender: render });
   if (route === 'unit') wireBubbles();
   if (route === 'review') wireStudyDecks(app, render);
@@ -932,8 +1040,9 @@ function loadConfig() {
   return api('config')
     .then((c) => {
       config = { ...c, aiEnabled: c.aiEnabled ?? c.chatEnabled };
-      const route = location.hash.split('/')[1];
-      if ((route === 'chat' || route === 'translate') && !stopSession) render(); // AI availability is now known
+      const route = location.hash.split('/')[1] || '';
+      // AI, email and ad settings are now known.
+      if (['', 'chat', 'translate'].includes(route) && !stopSession && !document.querySelector('.summary, .onboard')) render();
     })
     .catch((err) => {
       // Offline: leave it unknown and try again when the connection returns.

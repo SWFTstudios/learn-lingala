@@ -1,3 +1,10 @@
 # Copy to .dev.vars for local development (never commit real keys).
 # Live chat practice is switched off until this is set.
 ANTHROPIC_API_KEY=
+
+# Optional: email, text messages. Locally, email sending is simulated (logged, not sent).
+# EMAIL_FROM=Learn Lingala <hello@yourdomain.com>
+# APP_URL=http://localhost:8787
+# TWILIO_ACCOUNT_SID=
+# TWILIO_AUTH_TOKEN=
+# TWILIO_FROM=

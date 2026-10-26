@@ -35,8 +35,25 @@
   "vars": {
     // Optional bot protection: create a Turnstile widget, put its site key here,
     // and run `npx wrangler secret put TURNSTILE_SECRET_KEY`.
-    "TURNSTILE_SITE_KEY": ""
+    "TURNSTILE_SITE_KEY": "",
+    // Base URL used in links inside emails and texts (change it if you add a custom domain).
+    "APP_URL": "https://learn-lingala.elombe.workers.dev",
+    // Email (Cloudflare Email Service): the sender, on a domain onboarded in
+    // Compute > Email Service > Email Sending, e.g. "Learn Lingala <hello@yourdomain.com>".
+    // Email features stay off while this is empty.
+    "EMAIL_FROM": "",
+    // Text reminders (Pro): your Twilio number (+15551234567) or Messaging Service SID (MG…).
+    // Also run `npx wrangler secret put TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`.
+    "TWILIO_FROM": "",
+    // Ad banner: Google AdSense publisher ID (ca-pub-…) and ad unit slot ID.
+    // Until both are set, the banner space shows the app's own promos.
+    "ADSENSE_CLIENT": "",
+    "ADSENSE_SLOT": ""
   },
+  // Cloudflare Email Service binding for verification, password reset, word of the day and reminders.
+  "send_email": [{ "name": "EMAIL" }],
+  // Sends word-of-the-day emails and lesson reminders that are due.
+  "triggers": { "crons": ["*/15 * * * *"] },
   // Live chat practice needs a Claude API key: `npx wrangler secret put ANTHROPIC_API_KEY`.
   // Chat stays switched off (and the rest of the app works) until it is set.
   "observability": { "enabled": true }
