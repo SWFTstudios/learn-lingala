@@ -48,12 +48,22 @@ export const clearRecent = () => {
 
 // --- Course dictionary search ------------------------------------------------------
 
+// "I am hungry" should find "I'm hungry": spell out English contractions (after
+// normalize() has dropped the apostrophes) on both sides of the comparison.
+const CONTRACTIONS = {
+  im: 'i am', ive: 'i have', ill: 'i will', youre: 'you are', youve: 'you have', hes: 'he is', shes: 'she is',
+  its: 'it is', theyre: 'they are', dont: 'do not', doesnt: 'does not', didnt: 'did not', cant: 'can not',
+  cannot: 'can not', isnt: 'is not', arent: 'are not', wasnt: 'was not', wont: 'will not', whats: 'what is',
+  wheres: 'where is', hows: 'how is', whos: 'who is', thats: 'that is', theres: 'there is', lets: 'let us',
+};
+const searchKey = (text) => normalize(text).split(' ').map((w) => CONTRACTIONS[w] ?? w).join(' ');
+
 export function searchCourse(text, limit = 6) {
-  const q = normalize(text);
+  const q = searchKey(text);
   if (!q) return [];
   const scored = [];
   for (const item of ITEMS) {
-    const fields = [normalize(item.lg), normalize(gloss(item)), ...(item.alt || []).map(normalize)];
+    const fields = [searchKey(item.lg), searchKey(gloss(item)), ...(item.alt || []).map(searchKey)];
     let score = 0;
     for (const f of fields) {
       if (f === q) score = Math.max(score, 3);

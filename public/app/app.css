@@ -969,6 +969,45 @@ body.in-session { overflow: hidden; }
 
 /* --- Motion preferences ------------------------------------------------------------------------- */
 
+/* --- Install card + offline bar ------------------------------------------------------ */
+
+.install-card {
+  display: grid; grid-template-columns: 40px 1fr auto; column-gap: 0.9rem; row-gap: 0.7rem; align-items: center; margin-top: 0.9rem;
+  padding: 0.95rem 0.6rem 0.95rem 1.1rem; border-radius: var(--r);
+  background: var(--brand-50); border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+}
+.install-icon { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--brand); color: var(--on-brand); }
+.install-icon .icon { width: 22px; height: 22px; }
+.install-text { min-width: 0; display: flex; flex-direction: column; }
+.install-card [data-install] { grid-column: 2; grid-row: 2; justify-self: start; }
+.install-close { grid-column: 3; grid-row: 1; }
+.install-text small { color: var(--ink-2); font-size: 0.86rem; line-height: 1.45; }
+.install-close { color: var(--muted); }
+.share-glyph { display: inline-flex; vertical-align: -0.2em; color: var(--sky); }
+.share-glyph .icon { width: 1.15em; height: 1.15em; }
+.install-done { display: flex; align-items: center; gap: 0.4rem; color: var(--brand); font-weight: 650; }
+.settings [data-install] { margin-top: 0.6rem; }
+
+.net-bar {
+  position: fixed; z-index: 60; left: 12px; right: 12px;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px);
+  display: flex; align-items: center; gap: 0.6rem; margin: 0 auto; max-width: 520px;
+  padding: 0.7rem 1rem; border-radius: 14px; font-size: 0.9rem; line-height: 1.35;
+  background: var(--ink); color: var(--bg); box-shadow: var(--shadow-md);
+  animation: net-in 0.25s var(--ease);
+}
+.net-bar .icon { width: 20px; height: 20px; flex: none; }
+.net-offline .icon { color: var(--gold); }
+.net-online { background: var(--brand); color: var(--on-brand); }
+body.in-session .net-bar { bottom: auto; top: calc(env(safe-area-inset-top) + 10px); }
+@keyframes net-in { from { opacity: 0; transform: translateY(8px); } }
+/* AI actions still respond (with an explanation), but look unavailable. */
+.is-offline .tr-go, .is-offline .chat-send { opacity: 0.45; }
+@media (min-width: 900px) {
+  .net-bar { bottom: 20px; left: calc(var(--sidebar) + 20px); right: 20px; }
+  body.in-session .net-bar { left: 20px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

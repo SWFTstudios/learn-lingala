@@ -47,8 +47,9 @@ const levelLabel = (id) => (id ? t('chat.levelPlus', { n: levelIndex(id) + 1 }) 
 export function chatPickerHtml({ aiEnabled, signedIn, currentLevelId }) {
   const chats = loadChats();
   const current = levelIndex(currentLevelId);
-  const notice =
-    aiEnabled === false
+  const notice = !navigator.onLine
+    ? `<div class="notice">${icon('offline')}<span>${t('chat.offline')}</span></div>`
+    : aiEnabled === false
       ? `<div class="notice">${icon('chat')}<span>${t('chat.off')}</span></div>`
       : aiEnabled && !signedIn
         ? `<a href="#/account" class="notice notice-cta">${icon('lock')}<span><strong>${t('chat.signinTitle')}</strong> ${t('chat.signinBody')}</span></a>`

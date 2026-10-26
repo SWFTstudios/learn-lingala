@@ -13,6 +13,7 @@ import { chatPickerHtml, mountChat, isScenario, clearChats } from './chat.js';
 import { translateHtml, wireTranslate, clearRecent } from './translate.js';
 import { t, tn, setLang, getLang, LANGS, gloss, unitText, levelText, dialogueText } from './i18n.js';
 import { icon } from './icons.js';
+import { installCardHtml, installSettingsHtml, promptInstall, dismissInstall, onInstallChange, initOfflineBanner } from './pwa.js';
 
 const app = document.getElementById('app');
 const esc = (s) =>
@@ -262,6 +263,8 @@ function homeScreen() {
       <a href="#/translate" class="quick quick-tr">${icon('translate')}<strong>${t('home.trTitle')}</strong><small>${t('home.trSub')}</small></a>
     </div>
 
+    ${learned || u ? installCardHtml() : ''}
+
     <div class="mobile-only">${pathCard()}</div>
 
     ${
@@ -461,6 +464,7 @@ function settingsHtml() {
         ).join('')}
       </div>
       <p class="muted small">${t('acct.pace', { level: esc(levelText(LEVEL_BY_ID.get(CONVERSATIONAL)).title), when: weeksText(daysToLevel(CONVERSATIONAL, store.getCard, goal)) })}</p>
+      ${installSettingsHtml()}
     </section>`;
 }
 
@@ -662,6 +666,7 @@ function wireSettings() {
   document.querySelectorAll('.lang-seg [data-lang]').forEach((b) =>
     b.addEventListener('click', async () => {
       setLang(b.dataset.lang);
+      refreshNetBar();
       await store.setBaseLang(b.dataset.lang).catch((err) => alert(err.message));
       render();
     }),
@@ -866,22 +871,47 @@ store.subscribe(() => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') store.sync({ keepalive: true }).catch(() => {});
 });
-window.addEventListener('online', () => store.sync().catch(() => {}));
+window.addEventListener('online', () => {
+  store.sync().catch(() => {});
+  if (config.aiEnabled === null) loadConfig(); // it couldn't be fetched while offline
+});
+window.addEventListener('offline', () => {
+  if (location.hash.split('/')[1] === 'chat' && !stopSession) render(); // show the offline notice
+});
+
+// Install the app: the card's buttons, and redraw when the browser says it can (or did) install.
+const refreshNetBar = initOfflineBanner();
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-install]')) promptInstall();
+  const close = e.target.closest('[data-install-dismiss]');
+  if (close) {
+    dismissInstall();
+    close.closest('.install-card')?.remove();
+  }
+});
+onInstallChange(() => {
+  const route = location.hash.split('/')[1] || '';
+  if (!stopSession && !document.querySelector('.summary, .onboard') && (route === '' || route === 'account')) render();
+});
 
 render();
 store.refreshUser().then(() => {
   if (store.baseLang() && store.baseLang() !== getLang()) setLang(store.baseLang());
   if (!stopSession && !document.querySelector('.summary, .onboard')) render();
 });
-api('config')
-  .then((c) => {
-    config = { ...c, aiEnabled: c.aiEnabled ?? c.chatEnabled };
-    const route = location.hash.split('/')[1];
-    if ((route === 'chat' || route === 'translate') && !stopSession) render(); // AI availability is now known
-  })
-  .catch(() => {
-    config = { ...config, aiEnabled: false };
-  });
+function loadConfig() {
+  return api('config')
+    .then((c) => {
+      config = { ...c, aiEnabled: c.aiEnabled ?? c.chatEnabled };
+      const route = location.hash.split('/')[1];
+      if ((route === 'chat' || route === 'translate') && !stopSession) render(); // AI availability is now known
+    })
+    .catch((err) => {
+      // Offline: leave it unknown and try again when the connection returns.
+      if (err.status !== 0) config = { ...config, aiEnabled: false };
+    });
+}
+loadConfig();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {});
