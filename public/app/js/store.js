@@ -7,8 +7,15 @@ import { ITEM_BY_ID } from './course.js';
 const KEY = 'll-state-v1';
 
 function blank() {
-  return { cards: {}, dirty: [], events: [], serverDays: {}, goal: 20, user: null, lastSync: 0 };
+  return {
+    cards: {}, dirty: [], events: [], serverDays: {}, goal: 20, user: null, lastSync: 0,
+    // Device preferences (kept on sign-out).
+    baseLang: null, onboarded: false, motivation: null,
+  };
 }
+
+// What survives signing out: the device's language and onboarding.
+const devicePrefs = () => ({ baseLang: state.baseLang, onboarded: state.onboarded, motivation: state.motivation });
 
 let state = load();
 const listeners = new Set();
@@ -93,9 +100,44 @@ export async function setGoal(goal) {
   save();
 }
 
+// --- Preferences ----------------------------------------------------------------
+
+export const baseLang = () => state.baseLang;
+export const onboarded = () => state.onboarded;
+export const motivation = () => state.motivation;
+
+export async function setBaseLang(lang) {
+  state.baseLang = lang;
+  save();
+  if (state.user && state.user.baseLang !== lang) {
+    const { user: u } = await api('me', { method: 'PATCH', body: { baseLang: lang } });
+    state.user = u;
+    save();
+  }
+}
+
+export function finishOnboarding({ motivation: why, goal }) {
+  state.onboarded = true;
+  state.motivation = why || state.motivation;
+  if (goal) state.goal = goal;
+  save();
+}
+
+// The account's language wins when it has one; otherwise the device's is saved to it.
+async function reconcileLang(u) {
+  if (u.baseLang) {
+    state.baseLang = u.baseLang;
+  } else if (state.baseLang) {
+    await api('me', { method: 'PATCH', body: { baseLang: state.baseLang } }).catch(() => {});
+    u.baseLang = state.baseLang;
+  }
+}
+
 // After sign-in/sign-up, upload everything learned as a guest so it merges into the account.
 export async function signedIn(u) {
   state.user = u;
+  state.onboarded = true;
+  await reconcileLang(u);
   state.dirty = Object.keys(state.cards);
   save();
   await sync();
@@ -108,13 +150,13 @@ export async function signOut() {
     // Signing out anyway; unsynced progress on this device is discarded below.
   }
   await api('auth/logout', { method: 'POST', body: {} }).catch(() => {});
-  state = blank();
+  state = { ...blank(), ...devicePrefs() };
   save();
 }
 
 export async function deleteAccount(password) {
   await api('me', { method: 'DELETE', body: { password } });
-  state = blank();
+  state = { ...blank(), ...devicePrefs() };
   save();
 }
 
@@ -127,6 +169,8 @@ export async function refreshUser() {
       save();
     } else if (u) {
       state.user = u;
+      state.onboarded = true;
+      await reconcileLang(u);
       save();
       await sync();
     }

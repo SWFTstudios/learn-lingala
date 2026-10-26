@@ -1,0 +1,394 @@
+// Interface language (the learner's base language) and localized content.
+// Add a language: a LANGS entry, a STRINGS table, and a content layer like course-fr.js.
+
+import { FR_ITEMS, FR_UNITS, FR_LEVELS, FR_DIALOGUES, FR_SCENARIOS, FR_DRILL } from './course-fr.js';
+
+export const LANGS = {
+  en: { native: 'English', badge: 'EN', hint: 'Learn Lingala from English', speech: 'en-US' },
+  fr: { native: 'Français', badge: 'FR', hint: 'Apprendre le lingala depuis le français', speech: 'fr-FR' },
+};
+
+const STRINGS = {
+  en: {
+    'nav.main': 'Main', 'nav.learn': 'Learn', 'nav.review': 'Review', 'nav.chat': 'Chat', 'nav.translate': 'Translate',
+    'nav.account': 'Profile', 'nav.save': 'Save progress',
+    'title.learn': 'Learn', 'title.unit': 'Unit', 'title.level': 'Level', 'title.review': 'Review', 'title.chat': 'Chat practice',
+    'title.translate': 'Translate', 'title.phrases': 'Translate', 'title.account': 'Profile',
+    'common.course': 'Course', 'common.continue': 'Continue', 'common.start': 'Start', 'common.back': 'Back',
+    'btn.continue': 'Continue', 'btn.check': 'Check',
+    'who.you': 'You', 'who.them': 'Them',
+    'badge.local': 'Sounds local', 'badge.learned': 'Learned',
+
+    'pace.now': 'now', 'pace.days_one': 'in about {n} day', 'pace.days_other': 'in about {n} days',
+    'pace.weeks': 'in about {n} weeks — around {date}',
+    'rail.today': 'Today', 'rail.goalDone': 'Daily goal done', 'rail.goalLeft': '{n} XP to your daily goal',
+    'rail.changeGoal': 'Change goal', 'rail.streak_one': '{n}-day streak', 'rail.streak_other': '{n}-day streak',
+    'rail.keepItUp': 'Practise today to keep it going', 'rail.startStreak': 'Do a lesson to start a streak',
+    'rail.streakTitle': 'Day streak',
+    'path.title': 'Your path to conversational', 'path.levelOf': 'Level {n} of {total}',
+    'path.reached': "You've reached conversational level. Now sound like a local with <strong>Mwana mboka</strong>.",
+    'path.eta': 'At {goal} XP a day you’ll finish <strong>{level}</strong> {when}.',
+
+    'home.eyebrow': 'Ready for today’s lesson?', 'home.upNext': 'Up next', 'home.levelMore': 'Goals & checkpoint',
+    'home.practice': 'Practice', 'home.continue': 'Continue', 'home.start': 'Start here', 'home.level': 'Level {n}',
+    'home.learnedOf': '{n}/{total} learned', 'home.minutes': '≈ 3 min',
+    'home.due_one': '{n} phrase ready to review', 'home.due_other': '{n} phrases ready to review',
+    'home.dueSub': 'Reviewing at the right moment locks them into long-term memory.',
+    'home.chatTitle': 'Chat practice', 'home.chatSub': 'Text live with a Lingala speaker',
+    'home.trTitle': 'Translate', 'home.trSub': 'Type or speak any phrase',
+    'home.saveTitle': 'Save your progress', 'home.saveSub': 'Create a free account to keep your streak and learn on any device.',
+    'home.course': 'Course',
+    'mot.line.travel': 'Getting you ready for Kinshasa', 'mot.line.family': 'Closer to family, one phrase at a time',
+    'mot.line.music': 'Soon you’ll catch every rumba lyric', 'mot.line.friends': 'Talk with the people you love',
+    'mot.line.work': 'Building your working Lingala', 'mot.line.curious': 'Exploring a beautiful language',
+    'stat.learned': 'phrases learned', 'stat.mastered': 'mastered', 'stat.xp': 'total XP', 'stat.streak': 'day streak',
+
+    'level.canDo': 'By the end of this level you can…', 'level.checkpoint': 'Level checkpoint',
+    'level.checkpointDone': 'Prove it: a mixed test of this level with no hints. Score 80% to earn the level.',
+    'level.checkpointSkip': 'Already know some of this? Score 80% on a mixed test to skip ahead — everything in this level joins your reviews.',
+    'level.takeCheckpoint': 'Take the checkpoint', 'level.testOut': 'Test out of this level', 'level.units': 'Units',
+    'str.new': 'New', 'str.mastered': 'Mastered', 'str.weak': 'Needs review', 'str.ok': 'Learning', 'str.strong': 'Strong',
+    'unit.practice': 'Practice this unit', 'unit.continue': 'Continue lesson', 'unit.start': 'Start lesson',
+    'unit.how': 'How it works', 'unit.conversation': 'Conversation: {title}', 'unit.tapLine': 'Tap a line for the translation.',
+    'unit.roleplay': 'Role-play this conversation', 'unit.phrases': 'Phrases',
+
+    'review.eyebrow': 'Spaced repetition', 'review.title': 'Review',
+    'review.sub': 'Each phrase comes back right before you’d forget it.',
+    'review.empty': 'Nothing to review yet. Finish your first lesson and your phrases will show up here.',
+    'review.startLearning': 'Start learning', 'review.due': 'due',
+    'review.dueNow_one': '{n} phrase due now', 'review.dueNow_other': '{n} phrases due now',
+    'review.caughtUp': 'You’re all caught up', 'review.dueSub': 'A quick review takes about 2 minutes.',
+    'review.caughtUpSub': 'Practise your weakest phrases, or come back later.',
+    'review.start': 'Start review', 'review.practiceWeak': 'Practise weakest phrases', 'review.strength': 'Memory strength',
+    'review.conversations': 'Practise conversations',
+    'review.how': 'Get a phrase right and the gap before the next review grows (1 day → 3 → a week → a month…). Miss it and it comes back sooner.',
+
+    'acct.language': 'I speak', 'acct.goal': 'Daily goal',
+    'goal.10': '~5 min a day', 'goal.20': '~10 min a day', 'goal.30': '~15 min a day', 'goal.50': '~25 min a day',
+    'lang.en': 'English', 'lang.fr': 'French',
+    'goal.name.10': 'Casual', 'goal.name.20': 'Regular', 'goal.name.30': 'Serious', 'goal.name.50': 'Intense',
+    'acct.pace': 'At this pace you’ll finish {level} {when}.', 'acct.learner': 'Learner',
+    'acct.syncing': 'Changes waiting to sync…', 'acct.synced': 'All progress synced',
+    'acct.signout': 'Sign out', 'acct.delete': 'Delete account', 'acct.deleteWarn': 'This permanently deletes your account and all progress.',
+    'acct.confirmPassword': 'Confirm with your password', 'acct.deleteBtn': 'Delete my account',
+    'acct.eyebrow': 'Free account', 'acct.saveTitle': 'Save your progress', 'acct.welcomeBack': 'Welcome back',
+    'acct.saveSub': 'Your progress is saved on this device. Create a free account to keep your streak safe, chat with AI partners and learn on any device.',
+    'acct.signinSub': 'Sign in to sync your progress.', 'acct.create': 'Create account', 'acct.signin': 'Sign in',
+    'acct.name': 'Your name', 'acct.optional': '(optional)', 'acct.email': 'Email', 'acct.password': 'Password',
+    'acct.passwordHint': 'At least 8 characters.',
+    'acct.offlineSignout': 'You’re offline and some progress hasn’t synced. Sign out anyway?',
+    'acct.deleteConfirm': 'Delete your account and all progress permanently?',
+
+    'ob.welcomeTitle': 'Speak Lingala like you grew up with it',
+    'ob.welcomeSub': 'Short daily lessons, real Kinshasa conversations, and an AI partner to practise with.',
+    'ob.point1': 'Five levels from your first “Mbote” to sounding like a local',
+    'ob.point2': 'Live chat practice and instant translation',
+    'ob.point3': 'Science-backed reviews that make phrases stick',
+    'ob.getStarted': 'Get started', 'ob.haveAccount': 'I already have an account',
+    'ob.langTitle': 'What language do you speak?', 'ob.langSub': 'We’ll explain everything in this language.',
+    'ob.moreLangs': 'More languages are on the way.',
+    'ob.whyTitle': 'Why are you learning Lingala?', 'ob.whySub': 'We’ll keep your goal in mind.',
+    'mot.travel': 'Travelling to Congo', 'mot.family': 'Family & heritage', 'mot.music': 'Music & culture',
+    'mot.friends': 'Friends or partner', 'mot.work': 'Work', 'mot.curious': 'Just curious',
+    'mot.icon.travel': '✈️', 'mot.icon.family': '👨‍👩‍👧', 'mot.icon.music': '🎶', 'mot.icon.friends': '❤️', 'mot.icon.work': '💼', 'mot.icon.curious': '✨',
+    'ob.goalTitle': 'Pick a daily goal', 'ob.goalSub': 'Consistency beats intensity. You can change this any time.',
+    'ob.goalPace': 'At this pace you’ll finish Level 4 · Conversations {when}.',
+    'ob.levelTitle': 'How much Lingala do you know?', 'ob.levelSub': 'Already know some? Take a quick test and skip ahead.',
+    'ob.new': 'I’m new to Lingala', 'ob.newSub': 'Start with greetings — your first lesson takes 3 minutes.',
+    'ob.some': 'I know some Lingala', 'ob.someSub': 'Take the Level 1 checkpoint to test out.',
+
+    'ex.placeholder': 'Type in Lingala', 'ex.accentHint': 'Accents optional — plain e and o work too.',
+    'ex.sayAloud': 'Say it <strong>out loud</strong>, then check.', 'ex.showAnswer': 'Show answer',
+    'ex.likeThis': 'Did you say it like this?', 'ex.localTip': 'Local tip', 'ex.newUnit': 'New unit · {title}',
+    'ex.conversation': 'Conversation · {title}', 'ex.readAloud': 'Read it out loud. Tap a line for the translation — try to guess first.',
+    'ex.learnThis': 'Learn this', 'ex.new': 'New', 'ex.howSay': 'How do you say this in Lingala?', 'ex.whatMeans': 'What does this mean?',
+    'ex.yourTurn': 'Your turn — what do you say?', 'ex.youStart': 'You start the conversation.', 'ex.hint': 'Hint: {text}',
+    'ex.build': 'Build this in Lingala', 'ex.yourAnswer': 'Your answer', 'ex.type': 'Type this in Lingala',
+    'ex.drill': 'Pattern drill — change the sentence', 'ex.speak': 'Speak', 'ex.roleplay': 'Role-play — say your line',
+    'ex.warmup': 'Warm-up: tap the matching pairs', 'ex.quit': 'Quit', 'ex.notQuite': 'Not quite', 'ex.saidIt': 'I said it',
+    'ex.almost': 'Almost! Watch the spelling:', 'ex.keepPractising': 'Keep practising — it’ll come back soon.',
+    'ex.correct': 'Correct answer:', 'ex.quitConfirm': 'Quit now? Progress from this session will not be saved.',
+
+    'sum.levelPassed': 'Level {n} passed!', 'sum.notYet': 'Not quite yet', 'sum.conversationDone': 'Conversation complete!',
+    'sum.perfect': 'Perfect lesson!', 'sum.done': 'Lesson complete!',
+    'sum.failCheckpoint': 'You need 80% to pass <strong>{level}</strong>. Keep doing lessons and reviews — then try again.',
+    'sum.testedOut': 'You tested out of <strong>{level}</strong>. {n} phrases were added to your reviews to lock them in.',
+    'sum.proved': 'You’ve proven you can handle <strong>{level}</strong>. Malamu mingi!',
+    'sum.conversationSub': 'Role-playing real conversations is the fastest way to make phrases come out automatically.',
+    'sum.learned_one': 'You learned <strong>{n}</strong> new phrase', 'sum.learned_other': 'You learned <strong>{n}</strong> new phrases',
+    'sum.reviewed_one': 'reviewed {n}', 'sum.reviewed_other': 'reviewed {n}',
+    'sum.comeBack': 'They’ll come back right before you’d forget them.', 'sum.goalHit': 'Daily goal reached · {n}-day streak',
+    'sum.accuracy': 'accuracy', 'sum.time': 'time', 'sum.saveTitle': 'Don’t lose this',
+
+    'chat.eyebrow': 'AI conversation partners', 'chat.title': 'Chat practice',
+    'chat.sub': 'Text with a Lingala speaker in real time. They keep to your level, correct you gently, and suggest what to say if you’re stuck.',
+    'chat.off': 'Live chat practice isn’t switched on yet.',
+    'chat.signinTitle': 'Create a free account to chat.', 'chat.signinBody': 'Live practice uses AI, so it’s for signed-in learners.',
+    'chat.levelPlus': 'Level {n}+', 'chat.anyLevel': 'Any level', 'chat.stretch': 'stretch',
+    'chat.missionDone': 'Mission done', 'chat.inProgress': 'In progress', 'chat.freeTalk': 'Talk about anything you like.',
+    'chat.footnote': 'Your conversations stay on this device. Replies are generated by AI (Claude) and can contain mistakes — check anything surprising with a native speaker.',
+    'chat.newChat': 'New chat', 'chat.mission': 'Mission:', 'chat.tapHint': 'Tap any of {name}’s messages to see the translation.',
+    'chat.typing': '{name} is typing', 'chat.missionComplete': 'Mission complete! Malamu mingi. Keep chatting or try another partner.',
+    'chat.placeholder': 'Write in Lingala…', 'chat.send': 'Send', 'chat.resetConfirm': 'Start a new chat with {name}?',
+    'chat.signinAgain': 'Please <a href="#/account/login">sign in again</a> to keep going.',
+    'chat.signinAgainText': 'Please sign in again to keep going.',
+    'fb.great': 'Natural!', 'fb.ok': 'More natural:', 'fb.fix': 'Try:',
+
+    'tr.eyebrow': 'Dictionary', 'tr.title': 'Translate',
+    'tr.sub': 'Type or speak a word or phrase. We check the course dictionary first, then translate anything else with AI.',
+    'tr.swap': 'Swap languages', 'tr.placeholderBase': 'Type or say something in {lang}…', 'tr.placeholderLn': 'Type in Lingala…',
+    'tr.clear': 'Clear', 'tr.speak': 'Speak', 'tr.listening': 'Listening…',
+    'tr.micUnsupported': 'Voice input isn’t available in this browser — try Chrome or Safari.',
+    'tr.micLn': 'Browsers can’t recognise Lingala speech yet, so type it — or swap to speak in {lang}.',
+    'tr.micDenied': 'Microphone access is blocked. Allow it in your browser settings to use voice input.',
+    'tr.micError': 'Didn’t catch that. Try again.',
+    'tr.translate': 'Translate', 'tr.translating': 'Translating…', 'tr.signin': 'Sign in for AI translation',
+    'tr.recent': 'Recent', 'tr.browse': 'Phrasebook', 'tr.fromCourse': 'From the course',
+    'tr.noMatches': 'Not in the course yet — use AI translation.', 'tr.ai': 'AI translation',
+    'tr.conf.high': 'High confidence', 'tr.conf.medium': 'Medium confidence', 'tr.conf.low': 'Low confidence — check with a native speaker',
+    'tr.copy': 'Copy', 'tr.breakdown': 'Word by word', 'tr.alternatives': 'Other ways to say it', 'tr.example': 'Example',
+    'tr.aiNote': 'Generated by AI (Claude) — it can make mistakes, especially with slang.',
+    'phr.all': 'All', 'phr.local': 'Sounds local', 'phr.learned': 'Learned', 'phr.none': 'No phrases match.',
+
+    'aiErr.busy': 'It’s busy right now — try again in a minute.',
+    'aiErr.unavailable': 'AI features are temporarily unavailable.',
+    'aiErr.connection': 'There was a connection problem. Please try again.',
+    'aiErr.refused': 'That one couldn’t be answered. Try saying it a different way.',
+    'aiErr.muddled': 'Something got muddled. Please try again.',
+    'aiErr.quota': 'You’ve reached today’s limit. Tokomonana lóbi — see you tomorrow!',
+    'aiErr.too-long': 'That’s a bit long — keep it short.',
+    'aiErr.off': 'AI features aren’t switched on yet.',
+  },
+
+  fr: {
+    'nav.main': 'Principal', 'nav.learn': 'Apprendre', 'nav.review': 'Réviser', 'nav.chat': 'Discuter', 'nav.translate': 'Traduire',
+    'nav.account': 'Profil', 'nav.save': 'Sauvegarder',
+    'title.learn': 'Apprendre', 'title.unit': 'Unité', 'title.level': 'Niveau', 'title.review': 'Réviser', 'title.chat': 'Discussion',
+    'title.translate': 'Traduire', 'title.phrases': 'Traduire', 'title.account': 'Profil',
+    'common.course': 'Parcours', 'common.continue': 'Continuer', 'common.start': 'Commencer', 'common.back': 'Retour',
+    'btn.continue': 'Continuer', 'btn.check': 'Vérifier',
+    'who.you': 'Vous', 'who.them': 'Eux',
+    'badge.local': 'Comme un local', 'badge.learned': 'Appris',
+
+    'pace.now': 'dès maintenant', 'pace.days_one': 'dans environ {n} jour', 'pace.days_other': 'dans environ {n} jours',
+    'pace.weeks': 'dans environ {n} semaines — vers {date}',
+    'rail.today': 'Aujourd’hui', 'rail.goalDone': 'Objectif du jour atteint', 'rail.goalLeft': 'Encore {n} XP pour votre objectif',
+    'rail.changeGoal': 'Modifier l’objectif', 'rail.streak_one': '{n} jour de suite', 'rail.streak_other': '{n} jours de suite',
+    'rail.keepItUp': 'Pratiquez aujourd’hui pour garder la série', 'rail.startStreak': 'Faites une leçon pour lancer une série',
+    'rail.streakTitle': 'Jours de suite',
+    'path.title': 'Votre chemin vers la conversation', 'path.levelOf': 'Niveau {n} sur {total}',
+    'path.reached': 'Vous avez atteint le niveau conversation. Place à <strong>Mwana mboka</strong> pour parler comme un local.',
+    'path.eta': 'À {goal} XP par jour, vous terminerez <strong>{level}</strong> {when}.',
+
+    'home.eyebrow': 'Prêt pour la leçon du jour ?', 'home.upNext': 'À suivre', 'home.levelMore': 'Objectifs et test de niveau',
+    'home.practice': 'S’entraîner', 'home.continue': 'Continuer', 'home.start': 'Commencez ici', 'home.level': 'Niveau {n}',
+    'home.learnedOf': '{n}/{total} appris', 'home.minutes': '≈ 3 min',
+    'home.due_one': '{n} expression à réviser', 'home.due_other': '{n} expressions à réviser',
+    'home.dueSub': 'Réviser au bon moment les ancre dans la mémoire à long terme.',
+    'home.chatTitle': 'Discussion', 'home.chatSub': 'Échangez en direct avec un locuteur',
+    'home.trTitle': 'Traduire', 'home.trSub': 'Tapez ou dites n’importe quelle phrase',
+    'home.saveTitle': 'Sauvegardez votre progression', 'home.saveSub': 'Créez un compte gratuit pour garder votre série et apprendre sur tous vos appareils.',
+    'home.course': 'Parcours',
+    'mot.line.travel': 'On vous prépare pour Kinshasa', 'mot.line.family': 'Plus proche de la famille, phrase après phrase',
+    'mot.line.music': 'Bientôt, vous comprendrez chaque rumba', 'mot.line.friends': 'Parlez avec ceux que vous aimez',
+    'mot.line.work': 'Votre lingala pour le travail', 'mot.line.curious': 'À la découverte d’une belle langue',
+    'stat.learned': 'expressions apprises', 'stat.mastered': 'maîtrisées', 'stat.xp': 'XP au total', 'stat.streak': 'jours de suite',
+
+    'level.canDo': 'À la fin de ce niveau, vous saurez…', 'level.checkpoint': 'Test de niveau',
+    'level.checkpointDone': 'Prouvez-le : un test mixte de ce niveau, sans indices. Obtenez 80 % pour valider le niveau.',
+    'level.checkpointSkip': 'Vous en connaissez déjà une partie ? Obtenez 80 % à un test mixte pour avancer — tout le niveau rejoint vos révisions.',
+    'level.takeCheckpoint': 'Passer le test', 'level.testOut': 'Valider ce niveau par un test', 'level.units': 'Unités',
+    'str.new': 'Nouveau', 'str.mastered': 'Maîtrisé', 'str.weak': 'À revoir', 'str.ok': 'En cours', 'str.strong': 'Solide',
+    'unit.practice': 'S’entraîner sur cette unité', 'unit.continue': 'Continuer la leçon', 'unit.start': 'Commencer la leçon',
+    'unit.how': 'Comment ça marche', 'unit.conversation': 'Conversation : {title}', 'unit.tapLine': 'Touchez une ligne pour la traduction.',
+    'unit.roleplay': 'Jouer cette conversation', 'unit.phrases': 'Expressions',
+
+    'review.eyebrow': 'Répétition espacée', 'review.title': 'Réviser',
+    'review.sub': 'Chaque expression revient juste avant que vous ne l’oubliiez.',
+    'review.empty': 'Rien à réviser pour l’instant. Terminez votre première leçon et vos expressions apparaîtront ici.',
+    'review.startLearning': 'Commencer', 'review.due': 'à revoir',
+    'review.dueNow_one': '{n} expression à revoir', 'review.dueNow_other': '{n} expressions à revoir',
+    'review.caughtUp': 'Vous êtes à jour', 'review.dueSub': 'Une révision rapide prend environ 2 minutes.',
+    'review.caughtUpSub': 'Entraînez-vous sur vos expressions les plus fragiles, ou revenez plus tard.',
+    'review.start': 'Commencer la révision', 'review.practiceWeak': 'Revoir les plus fragiles', 'review.strength': 'Force de la mémoire',
+    'review.conversations': 'S’entraîner aux conversations',
+    'review.how': 'Une bonne réponse et l’intervalle avant la prochaine révision s’allonge (1 jour → 3 → une semaine → un mois…). Une erreur et l’expression revient plus tôt.',
+
+    'acct.language': 'Je parle', 'acct.goal': 'Objectif quotidien',
+    'goal.10': '~5 min par jour', 'goal.20': '~10 min par jour', 'goal.30': '~15 min par jour', 'goal.50': '~25 min par jour',
+    'lang.en': 'anglais', 'lang.fr': 'français',
+    'goal.name.10': 'Tranquille', 'goal.name.20': 'Régulier', 'goal.name.30': 'Sérieux', 'goal.name.50': 'Intensif',
+    'acct.pace': 'À ce rythme, vous terminerez {level} {when}.', 'acct.learner': 'Apprenant',
+    'acct.syncing': 'Modifications en attente de synchronisation…', 'acct.synced': 'Progression synchronisée',
+    'acct.signout': 'Se déconnecter', 'acct.delete': 'Supprimer le compte', 'acct.deleteWarn': 'Cela supprime définitivement votre compte et toute votre progression.',
+    'acct.confirmPassword': 'Confirmez avec votre mot de passe', 'acct.deleteBtn': 'Supprimer mon compte',
+    'acct.eyebrow': 'Compte gratuit', 'acct.saveTitle': 'Sauvegardez votre progression', 'acct.welcomeBack': 'Bon retour',
+    'acct.saveSub': 'Votre progression est enregistrée sur cet appareil. Créez un compte gratuit pour protéger votre série, discuter avec des partenaires IA et apprendre partout.',
+    'acct.signinSub': 'Connectez-vous pour synchroniser votre progression.', 'acct.create': 'Créer un compte', 'acct.signin': 'Se connecter',
+    'acct.name': 'Votre prénom', 'acct.optional': '(facultatif)', 'acct.email': 'E-mail', 'acct.password': 'Mot de passe',
+    'acct.passwordHint': 'Au moins 8 caractères.',
+    'acct.offlineSignout': 'Vous êtes hors ligne et une partie de votre progression n’est pas synchronisée. Se déconnecter quand même ?',
+    'acct.deleteConfirm': 'Supprimer définitivement votre compte et toute votre progression ?',
+
+    'ob.welcomeTitle': 'Parlez lingala comme si vous aviez grandi avec',
+    'ob.welcomeSub': 'De courtes leçons quotidiennes, de vraies conversations de Kinshasa et un partenaire IA pour pratiquer.',
+    'ob.point1': 'Cinq niveaux, de votre premier « Mbote » jusqu’à parler comme un local',
+    'ob.point2': 'Discussion en direct et traduction instantanée',
+    'ob.point3': 'Des révisions fondées sur la science pour tout retenir',
+    'ob.getStarted': 'Commencer', 'ob.haveAccount': 'J’ai déjà un compte',
+    'ob.langTitle': 'Quelle langue parlez-vous ?', 'ob.langSub': 'Toutes les explications seront dans cette langue.',
+    'ob.moreLangs': 'D’autres langues arrivent bientôt.',
+    'ob.whyTitle': 'Pourquoi apprenez-vous le lingala ?', 'ob.whySub': 'Nous garderons votre objectif en tête.',
+    'mot.travel': 'Voyager au Congo', 'mot.family': 'Famille et racines', 'mot.music': 'Musique et culture',
+    'mot.friends': 'Amis ou partenaire', 'mot.work': 'Travail', 'mot.curious': 'Par curiosité',
+    'ob.goalTitle': 'Choisissez un objectif quotidien', 'ob.goalSub': 'La régularité compte plus que l’intensité. Vous pourrez le changer à tout moment.',
+    'ob.goalPace': 'À ce rythme, vous terminerez le niveau 4 · Conversations {when}.',
+    'ob.levelTitle': 'Quel est votre niveau en lingala ?', 'ob.levelSub': 'Vous en connaissez déjà ? Passez un test rapide et avancez.',
+    'ob.new': 'Je débute', 'ob.newSub': 'Commencez par les salutations — la première leçon dure 3 minutes.',
+    'ob.some': 'Je connais un peu de lingala', 'ob.someSub': 'Passez le test du niveau 1 pour le valider.',
+
+    'ex.placeholder': 'Tapez en lingala', 'ex.accentHint': 'Accents facultatifs — un simple e ou o suffit.',
+    'ex.sayAloud': 'Dites-le <strong>à voix haute</strong>, puis vérifiez.', 'ex.showAnswer': 'Voir la réponse',
+    'ex.likeThis': 'Vous l’avez dit comme ça ?', 'ex.localTip': 'Astuce locale', 'ex.newUnit': 'Nouvelle unité · {title}',
+    'ex.conversation': 'Conversation · {title}', 'ex.readAloud': 'Lisez-la à voix haute. Touchez une ligne pour la traduction — essayez de deviner d’abord.',
+    'ex.learnThis': 'À retenir', 'ex.new': 'Nouveau', 'ex.howSay': 'Comment dit-on ceci en lingala ?', 'ex.whatMeans': 'Que veut dire ceci ?',
+    'ex.yourTurn': 'À vous — que dites-vous ?', 'ex.youStart': 'C’est vous qui commencez la conversation.', 'ex.hint': 'Indice : {text}',
+    'ex.build': 'Construisez la phrase en lingala', 'ex.yourAnswer': 'Votre réponse', 'ex.type': 'Écrivez ceci en lingala',
+    'ex.drill': 'Exercice de structure — transformez la phrase', 'ex.speak': 'À l’oral', 'ex.roleplay': 'Jeu de rôle — dites votre réplique',
+    'ex.warmup': 'Échauffement : associez les paires', 'ex.quit': 'Quitter', 'ex.notQuite': 'Pas tout à fait', 'ex.saidIt': 'Je l’ai dit',
+    'ex.almost': 'Presque ! Attention à l’orthographe :', 'ex.keepPractising': 'Continuez — elle reviendra bientôt.',
+    'ex.correct': 'Bonne réponse :', 'ex.quitConfirm': 'Quitter maintenant ? La progression de cette séance ne sera pas enregistrée.',
+
+    'sum.levelPassed': 'Niveau {n} validé !', 'sum.notYet': 'Pas encore', 'sum.conversationDone': 'Conversation terminée !',
+    'sum.perfect': 'Leçon parfaite !', 'sum.done': 'Leçon terminée !',
+    'sum.failCheckpoint': 'Il faut 80 % pour valider <strong>{level}</strong>. Continuez les leçons et les révisions, puis réessayez.',
+    'sum.testedOut': 'Vous avez validé <strong>{level}</strong>. {n} expressions ont rejoint vos révisions pour bien les fixer.',
+    'sum.proved': 'Vous maîtrisez <strong>{level}</strong>. Malamu mingi !',
+    'sum.conversationSub': 'Jouer de vraies conversations est le moyen le plus rapide pour que les phrases sortent toutes seules.',
+    'sum.learned_one': 'Vous avez appris <strong>{n}</strong> nouvelle expression', 'sum.learned_other': 'Vous avez appris <strong>{n}</strong> nouvelles expressions',
+    'sum.reviewed_one': '{n} révisée', 'sum.reviewed_other': '{n} révisées',
+    'sum.comeBack': 'Elles reviendront juste avant que vous ne les oubliiez.', 'sum.goalHit': 'Objectif du jour atteint · {n} jours de suite',
+    'sum.accuracy': 'précision', 'sum.time': 'durée', 'sum.saveTitle': 'Ne perdez pas ça',
+
+    'chat.eyebrow': 'Partenaires de conversation IA', 'chat.title': 'Discussion',
+    'chat.sub': 'Échangez par écrit avec un locuteur de lingala en temps réel. Il reste à votre niveau, vous corrige avec douceur et vous suggère quoi dire si vous bloquez.',
+    'chat.off': 'La discussion en direct n’est pas encore activée.',
+    'chat.signinTitle': 'Créez un compte gratuit pour discuter.', 'chat.signinBody': 'La pratique en direct utilise l’IA ; elle est réservée aux apprenants connectés.',
+    'chat.levelPlus': 'Niveau {n}+', 'chat.anyLevel': 'Tous niveaux', 'chat.stretch': 'défi',
+    'chat.missionDone': 'Mission accomplie', 'chat.inProgress': 'En cours', 'chat.freeTalk': 'Parlez de tout ce qui vous plaît.',
+    'chat.footnote': 'Vos conversations restent sur cet appareil. Les réponses sont générées par une IA (Claude) et peuvent contenir des erreurs — vérifiez ce qui vous surprend auprès d’un locuteur natif.',
+    'chat.newChat': 'Nouvelle discussion', 'chat.mission': 'Mission :', 'chat.tapHint': 'Touchez un message de {name} pour voir la traduction.',
+    'chat.typing': '{name} écrit', 'chat.missionComplete': 'Mission accomplie ! Malamu mingi. Continuez ou essayez un autre partenaire.',
+    'chat.placeholder': 'Écrivez en lingala…', 'chat.send': 'Envoyer', 'chat.resetConfirm': 'Recommencer une discussion avec {name} ?',
+    'chat.signinAgain': 'Veuillez <a href="#/account/login">vous reconnecter</a> pour continuer.',
+    'chat.signinAgainText': 'Veuillez vous reconnecter pour continuer.',
+    'fb.great': 'Naturel !', 'fb.ok': 'Plus naturel :', 'fb.fix': 'Essayez :',
+
+    'tr.eyebrow': 'Dictionnaire', 'tr.title': 'Traduire',
+    'tr.sub': 'Tapez ou dites un mot ou une phrase. Nous cherchons d’abord dans le dictionnaire du cours, puis l’IA traduit tout le reste.',
+    'tr.swap': 'Inverser les langues', 'tr.placeholderBase': 'Tapez ou dites quelque chose en {lang}…', 'tr.placeholderLn': 'Tapez en lingala…',
+    'tr.clear': 'Effacer', 'tr.speak': 'Parler', 'tr.listening': 'Je vous écoute…',
+    'tr.micUnsupported': 'La saisie vocale n’est pas disponible dans ce navigateur — essayez Chrome ou Safari.',
+    'tr.micLn': 'Les navigateurs ne reconnaissent pas encore le lingala parlé : tapez-le, ou inversez pour parler en {lang}.',
+    'tr.micDenied': 'L’accès au micro est bloqué. Autorisez-le dans les réglages du navigateur pour utiliser la voix.',
+    'tr.micError': 'Je n’ai pas compris. Réessayez.',
+    'tr.translate': 'Traduire', 'tr.translating': 'Traduction…', 'tr.signin': 'Connectez-vous pour la traduction IA',
+    'tr.recent': 'Récents', 'tr.browse': 'Lexique', 'tr.fromCourse': 'Dans le cours',
+    'tr.noMatches': 'Pas encore dans le cours — utilisez la traduction IA.', 'tr.ai': 'Traduction IA',
+    'tr.conf.high': 'Fiabilité élevée', 'tr.conf.medium': 'Fiabilité moyenne', 'tr.conf.low': 'Fiabilité faible — vérifiez auprès d’un locuteur natif',
+    'tr.copy': 'Copier', 'tr.breakdown': 'Mot à mot', 'tr.alternatives': 'Autres façons de le dire', 'tr.example': 'Exemple',
+    'tr.aiNote': 'Généré par une IA (Claude) — elle peut se tromper, surtout avec l’argot.',
+    'phr.all': 'Tout', 'phr.local': 'Comme un local', 'phr.learned': 'Appris', 'phr.none': 'Aucune expression ne correspond.',
+
+    'aiErr.busy': 'C’est très demandé en ce moment — réessayez dans une minute.',
+    'aiErr.unavailable': 'Les fonctions IA sont momentanément indisponibles.',
+    'aiErr.connection': 'Problème de connexion. Veuillez réessayer.',
+    'aiErr.refused': 'Impossible de répondre à cela. Essayez de le formuler autrement.',
+    'aiErr.muddled': 'Quelque chose s’est mélangé. Veuillez réessayer.',
+    'aiErr.quota': 'Vous avez atteint la limite du jour. Tokomonana lóbi — à demain !',
+    'aiErr.too-long': 'C’est un peu long — faites plus court.',
+    'aiErr.off': 'Les fonctions IA ne sont pas encore activées.',
+  },
+};
+
+let lang = 'en';
+
+export const getLang = () => lang;
+
+export function setLang(l) {
+  lang = LANGS[l] ? l : 'en';
+  if (typeof document !== 'undefined') document.documentElement.lang = lang;
+  return lang;
+}
+
+export function t(key, vars = {}) {
+  const s = STRINGS[lang][key] ?? STRINGS.en[key] ?? key;
+  return s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+}
+
+export const tn = (key, n, vars = {}) => t(`${key}_${n === 1 ? 'one' : 'other'}`, { n, ...vars });
+
+export const hasKey = (key, l = 'en') => key in STRINGS[l];
+export const stringKeys = (l) => Object.keys(STRINGS[l]);
+
+export const langName = (id) => LANGS[id]?.native ?? id;
+// The language's name as it appears mid-sentence in the interface language ("en français").
+export const langInText = (id) => (hasKey(`lang.${id}`) ? t(`lang.${id}`) : langName(id));
+
+// Error from the AI endpoints: short codes become friendly, localized sentences.
+export function aiError(err) {
+  const key = `aiErr.${err.message}`;
+  return hasKey(key) ? t(key) : err.message;
+}
+
+// --- Localized course content ------------------------------------------------------
+
+const frItem = (id) => {
+  const e = FR_ITEMS[id];
+  return typeof e === 'string' ? { m: e } : e;
+};
+const fr = () => lang === 'fr';
+
+export const gloss = (item) => (fr() && frItem(item.id)?.m) || item.en;
+export const itemNote = (item) => (fr() ? frItem(item.id)?.note : item.note);
+export const itemTip = (item) => (fr() ? frItem(item.id)?.tip : item.tip);
+
+export function unitText(unit) {
+  const f = fr() && FR_UNITS[unit.id];
+  return { title: f?.title || unit.title, intro: f?.intro || unit.intro };
+}
+
+export function levelText(level) {
+  const f = fr() && FR_LEVELS[level.id];
+  return {
+    title: f?.title || level.title,
+    subtitle: f?.subtitle || level.subtitle,
+    weeks: f?.weeks || level.weeks,
+    canDo: f?.canDo || level.canDo,
+  };
+}
+
+export function dialogueText(unit) {
+  const d = unit.dialogue;
+  const f = fr() && FR_DIALOGUES[unit.id];
+  return {
+    title: f?.title || d.title,
+    setting: f?.setting || d.setting,
+    lines: d.lines.map((l, i) => f?.lines?.[i] || l.en),
+  };
+}
+
+export function scenarioText(s) {
+  const f = fr() && FR_SCENARIOS[s.id];
+  return {
+    title: f?.title || s.title,
+    setting: f?.setting || s.setting,
+    mission: f ? f.mission : s.mission,
+    opener: f?.opener || s.opener.en,
+  };
+}
+
+export function drillText(item) {
+  const d = item.drill;
+  return { fromEn: (fr() && FR_DRILL[d.fromEn]) || d.fromEn, cue: (fr() && FR_DRILL[d.cue]) || d.cue };
+}

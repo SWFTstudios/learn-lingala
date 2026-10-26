@@ -1,7 +1,7 @@
 // Offline support. Network-first so a new deploy is picked up immediately;
 // the cache is only a fallback when there's no connection. API calls are never cached.
 
-const CACHE = 'learn-lingala-v3';
+const CACHE = 'learn-lingala-v4';
 const SHELL = [
   '/app/',
   '/app/app.css',
@@ -17,6 +17,12 @@ const SHELL = [
   '/app/js/player.js',
   '/app/js/chat.js',
   '/app/js/chat-scenarios.js',
+  '/app/js/translate.js',
+  '/app/js/i18n.js',
+  '/app/js/course-fr.js',
+  '/app/js/icons.js',
+  '/app/fonts/inter-latin.woff2',
+  '/app/fonts/inter-latin-ext.woff2',
 ];
 
 self.addEventListener('install', (event) => {

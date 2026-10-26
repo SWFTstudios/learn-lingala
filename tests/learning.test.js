@@ -193,3 +193,85 @@ test('chat scenarios: unique, complete, and tied to real course levels', async (
   }
   assert.ok(SCENARIOS.filter((s) => s.mission).length >= 5, 'most partners come with a mission');
 });
+
+// --- Base language (i18n) ------------------------------------------------------------
+
+import { readFileSync, readdirSync } from 'node:fs';
+import { FR_ITEMS, FR_UNITS, FR_LEVELS, FR_DIALOGUES, FR_SCENARIOS, FR_DRILL } from '../public/app/js/course-fr.js';
+import { setLang, t, gloss, hasKey, stringKeys, LANGS } from '../public/app/js/i18n.js';
+
+const frEntry = (id) => (typeof FR_ITEMS[id] === 'string' ? { m: FR_ITEMS[id] } : FR_ITEMS[id]);
+
+test('French: every item has a meaning, and every note/tip is translated', () => {
+  for (const i of ITEMS) {
+    const f = frEntry(i.id);
+    assert.ok(f?.m, `missing French meaning for ${i.id}`);
+    if (i.note) assert.ok(f.note, `missing French note for ${i.id}`);
+    if (i.tip) assert.ok(f.tip, `missing French tip for ${i.id}`);
+  }
+  for (const id of Object.keys(FR_ITEMS)) assert.ok(ITEMS.some((i) => i.id === id), `stray French entry ${id}`);
+  // French prompts must be unambiguous within a unit too.
+  for (const u of UNITS) {
+    const ms = u.items.map((i) => normalize(frEntry(i.id).m));
+    assert.equal(new Set(ms).size, ms.length, `duplicate French meaning in ${u.id}`);
+  }
+});
+
+test('French: units, levels, dialogues, scenarios and drill cues are complete', async () => {
+  const { SCENARIOS } = await import('../public/app/js/chat-scenarios.js');
+  for (const u of UNITS) {
+    assert.ok(FR_UNITS[u.id]?.title && FR_UNITS[u.id]?.intro, `unit ${u.id}`);
+    if (u.dialogue) {
+      const d = FR_DIALOGUES[u.id];
+      assert.ok(d?.title && d?.setting, `dialogue ${u.id}`);
+      assert.equal(d.lines.length, u.dialogue.lines.length, `dialogue ${u.id} line count`);
+    }
+  }
+  for (const l of LEVELS) {
+    const f = FR_LEVELS[l.id];
+    assert.ok(f?.title && f?.subtitle && f?.weeks, `level ${l.id}`);
+    assert.equal(f.canDo.length, l.canDo.length, `level ${l.id} can-do count`);
+  }
+  for (const s of SCENARIOS) {
+    const f = FR_SCENARIOS[s.id];
+    assert.ok(f?.title && f?.setting && f?.opener, `scenario ${s.id}`);
+    assert.equal(!!f.mission, !!s.mission, `scenario ${s.id} mission`);
+  }
+  for (const i of ITEMS.filter((x) => x.drill)) {
+    assert.ok(FR_DRILL[i.drill.fromEn], `drill text "${i.drill.fromEn}"`);
+    assert.ok(FR_DRILL[i.drill.cue], `drill cue "${i.drill.cue}"`);
+  }
+});
+
+test('gloss() follows the base language', () => {
+  const mbote = ITEMS.find((i) => i.id === 'g-mbote');
+  setLang('fr');
+  assert.equal(gloss(mbote), 'Bonjour');
+  assert.equal(t('nav.learn'), 'Apprendre');
+  setLang('en');
+  assert.equal(gloss(mbote), 'Hello');
+  assert.equal(setLang('xx'), 'en', 'unsupported languages fall back to English');
+});
+
+test('UI strings: every key used in the app exists in every language', () => {
+  const dir = new URL('../public/app/js/', import.meta.url);
+  const src = readdirSync(dir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dir), 'utf8')).join('\n');
+  const used = new Set();
+  for (const [, key] of src.matchAll(/\bt\('([a-zA-Z0-9.-]+)'/g)) used.add(key);
+  for (const [, key] of src.matchAll(/\btn\('([a-zA-Z0-9.-]+)'/g)) used.add(`${key}_one`).add(`${key}_other`);
+  // Keys built at runtime.
+  for (const k of ['learn', 'review', 'chat', 'translate', 'account']) used.add(`nav.${k}`);
+  for (const g of [10, 20, 30, 50]) used.add(`goal.${g}`).add(`goal.name.${g}`);
+  for (const m of ['travel', 'family', 'music', 'friends', 'work', 'curious']) used.add(`mot.${m}`).add(`mot.line.${m}`).add(`mot.icon.${m}`);
+  for (const c of ['high', 'medium', 'low']) used.add(`tr.conf.${c}`);
+  for (const r of ['learn', 'unit', 'level', 'review', 'chat', 'translate', 'phrases', 'account']) used.add(`title.${r}`);
+  for (const e of ['busy', 'unavailable', 'connection', 'refused', 'muddled', 'quota', 'too-long', 'off']) used.add(`aiErr.${e}`);
+
+  for (const key of used) assert.ok(hasKey(key, 'en'), `missing English string ${key}`);
+  for (const lang of Object.keys(LANGS)) {
+    for (const key of stringKeys('en')) {
+      if (key.startsWith('mot.icon.')) continue; // emoji, shared
+      assert.ok(hasKey(key, lang), `missing ${lang} string ${key}`);
+    }
+  }
+});
