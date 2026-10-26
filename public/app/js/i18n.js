@@ -90,7 +90,6 @@ const STRINGS = {
     'ob.whyTitle': 'Why are you learning Lingala?', 'ob.whySub': 'We’ll keep your goal in mind.',
     'mot.travel': 'Travelling to Congo', 'mot.family': 'Family & heritage', 'mot.music': 'Music & culture',
     'mot.friends': 'Friends or partner', 'mot.work': 'Work', 'mot.curious': 'Just curious',
-    'mot.icon.travel': '✈️', 'mot.icon.family': '👨‍👩‍👧', 'mot.icon.music': '🎶', 'mot.icon.friends': '❤️', 'mot.icon.work': '💼', 'mot.icon.curious': '✨',
     'ob.goalTitle': 'Pick a daily goal', 'ob.goalSub': 'Consistency beats intensity. You can change this any time.',
     'ob.goalPace': 'At this pace you’ll finish Level 4 · Conversations {when}.',
     'ob.levelTitle': 'How much Lingala do you know?', 'ob.levelSub': 'Already know some? Take a quick test and skip ahead.',
@@ -153,6 +152,19 @@ const STRINGS = {
     'aiErr.busy': 'It’s busy right now — try again in a minute.',
     'aiErr.unavailable': 'AI features are temporarily unavailable.',
     'aiErr.connection': 'There was a connection problem. Please try again.',
+    'aiErr.offline': 'You’re offline. Chat and AI translation need a connection.',
+    'net.offline': 'You’re offline.',
+    'net.offlineSub': 'Lessons, reviews and the dictionary still work.',
+    'net.back': 'Back online',
+    'offline.request': 'You’re offline. Your progress is saved on this device and will sync later.',
+    'chat.offline': 'You’re offline. Chat practice needs a connection — your conversations will be here when you’re back.',
+    'pwa.title': 'Install Learn Lingala',
+    'pwa.sub': 'Opens full-screen from your home screen and works offline.',
+    'pwa.install': 'Install',
+    'pwa.notNow': 'Not now',
+    'pwa.installed': 'Installed on this device',
+    'pwa.settingsTitle': 'App',
+    'pwa.iosSteps': 'Tap {share} Share, then “Add to Home Screen”. It opens full-screen and keeps your progress safe offline.',
     'aiErr.refused': 'That one couldn’t be answered. Try saying it a different way.',
     'aiErr.muddled': 'Something got muddled. Please try again.',
     'aiErr.quota': 'You’ve reached today’s limit. Tokomonana lóbi — see you tomorrow!',
@@ -303,6 +315,19 @@ const STRINGS = {
     'aiErr.busy': 'C’est très demandé en ce moment — réessayez dans une minute.',
     'aiErr.unavailable': 'Les fonctions IA sont momentanément indisponibles.',
     'aiErr.connection': 'Problème de connexion. Veuillez réessayer.',
+    'aiErr.offline': 'Vous êtes hors ligne. La discussion et la traduction IA ont besoin d’une connexion.',
+    'net.offline': 'Vous êtes hors ligne.',
+    'net.offlineSub': 'Les leçons, les révisions et le dictionnaire fonctionnent toujours.',
+    'net.back': 'De retour en ligne',
+    'offline.request': 'Vous êtes hors ligne. Votre progression est enregistrée sur cet appareil et sera synchronisée plus tard.',
+    'chat.offline': 'Vous êtes hors ligne. La discussion a besoin d’une connexion — vos conversations vous attendront à votre retour.',
+    'pwa.title': 'Installer Learn Lingala',
+    'pwa.sub': 'S’ouvre en plein écran depuis votre écran d’accueil et fonctionne hors ligne.',
+    'pwa.install': 'Installer',
+    'pwa.notNow': 'Plus tard',
+    'pwa.installed': 'Installée sur cet appareil',
+    'pwa.settingsTitle': 'Application',
+    'pwa.iosSteps': 'Touchez {share} Partager, puis « Sur l’écran d’accueil ». L’app s’ouvre en plein écran et garde votre progression hors ligne.',
     'aiErr.refused': 'Impossible de répondre à cela. Essayez de le formuler autrement.',
     'aiErr.muddled': 'Quelque chose s’est mélangé. Veuillez réessayer.',
     'aiErr.quota': 'Vous avez atteint la limite du jour. Tokomonana lóbi — à demain !',
@@ -337,6 +362,7 @@ export const langInText = (id) => (hasKey(`lang.${id}`) ? t(`lang.${id}`) : lang
 
 // Error from the AI endpoints: short codes become friendly, localized sentences.
 export function aiError(err) {
+  if (err.status === 0) return t('aiErr.offline'); // the request never reached the server
   const key = `aiErr.${err.message}`;
   return hasKey(key) ? t(key) : err.message;
 }

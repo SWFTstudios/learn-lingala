@@ -1,5 +1,7 @@
 // Thin fetch wrapper for the Worker API.
 
+import { t } from './i18n.js';
+
 export class ApiError extends Error {
   constructor(status, message) {
     super(message);
@@ -18,7 +20,7 @@ export async function api(path, { method = 'GET', body, keepalive = false } = {}
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, "You're offline. Your progress is saved on this device and will sync later.");
+    throw new ApiError(0, t('offline.request'));
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data.error || `Request failed (${res.status})`);

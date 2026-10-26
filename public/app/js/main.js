@@ -12,7 +12,8 @@ import * as store from './store.js';
 import { chatPickerHtml, mountChat, isScenario, clearChats } from './chat.js';
 import { translateHtml, wireTranslate, clearRecent } from './translate.js';
 import { t, tn, setLang, getLang, LANGS, gloss, unitText, levelText, dialogueText } from './i18n.js';
-import { icon } from './icons.js';
+import { icon, unitIcon } from './icons.js';
+import { installCardHtml, installSettingsHtml, promptInstall, dismissInstall, onInstallChange, initOfflineBanner } from './pwa.js';
 
 const app = document.getElementById('app');
 const esc = (s) =>
@@ -20,6 +21,7 @@ const esc = (s) =>
 
 const CONVERSATIONAL = 'conversations'; // the level that marks "conversational"
 const MOTIVATIONS = ['travel', 'family', 'music', 'friends', 'work', 'curious'];
+const MOTIVATION_ICONS = { travel: 'plane', family: 'home', music: 'music', friends: 'heart', work: 'briefcase', curious: 'compass' };
 const GOALS = [10, 20, 30, 50];
 
 let config = { turnstileSiteKey: null, aiEnabled: null }; // null = still loading
@@ -187,7 +189,7 @@ function unitRow(un, isCurrent) {
   const text = unitText(un);
   return `
     <a href="#/unit/${un.id}" class="unit-row ${p.done ? 'done' : ''} ${isCurrent ? 'current' : ''}">
-      ${ring(p.learned / p.total, 52, 5, `<span class="unit-emoji">${un.emoji}</span>`)}
+      ${ring(p.learned / p.total, 52, 5, unitIcon(un, 'in-ring'))}
       <span class="unit-text">
         <span class="unit-title">${esc(text.title)} ${isCurrent ? `<span class="badge badge-next">${t('home.upNext')}</span>` : ''}</span>
         <span class="unit-sub"><span lang="ln">${esc(un.lg)}</span>${un.dialogue ? ` · ${icon('chat')}` : ''}</span>
@@ -240,7 +242,7 @@ function homeScreen() {
     </div>
 
     <a href="#/lesson/${unit.id}" class="hero">
-      <span class="hero-art" aria-hidden="true">${unit.emoji}</span>
+      <span class="hero-art" aria-hidden="true">${icon(unit.icon)}</span>
       <span class="hero-body">
         <span class="hero-kicker">${prog.done ? t('home.practice') : learned ? t('home.continue') : t('home.start')} · ${t('home.level', { n: levelNumber(level) })}</span>
         <span class="hero-title">${esc(unitText(unit).title)}</span>
@@ -261,6 +263,8 @@ function homeScreen() {
       <a href="#/chat" class="quick quick-chat">${icon('chat')}<strong>${t('home.chatTitle')}</strong><small>${t('home.chatSub')}</small></a>
       <a href="#/translate" class="quick quick-tr">${icon('translate')}<strong>${t('home.trTitle')}</strong><small>${t('home.trSub')}</small></a>
     </div>
+
+    ${learned || u ? installCardHtml() : ''}
 
     <div class="mobile-only">${pathCard()}</div>
 
@@ -353,7 +357,7 @@ function unitScreen(id) {
     `
     <a href="#/level/${level.id}" class="back">${icon('back')} ${t('home.level', { n: levelNumber(level) })} · ${esc(levelText(level).title)}</a>
     <header class="page-head unit-head">
-      <span class="unit-hero-emoji" aria-hidden="true">${unit.emoji}</span>
+      ${unitIcon(unit, 'lg')}
       <div>
         <h1>${esc(text.title)}</h1>
         <p class="lede"><span lang="ln">${esc(unit.lg)}</span> · ${t('home.learnedOf', { n: p.learned, total: p.total })}</p>
@@ -423,7 +427,7 @@ function reviewScreen() {
       talkable.length
         ? `<h2 class="section-title">${t('review.conversations')}</h2>
            <div class="units">${talkable
-             .map((u) => `<a href="#/talk/${u.id}" class="unit-row"><span class="unit-emoji solo">${u.emoji}</span>
+             .map((u) => `<a href="#/talk/${u.id}" class="unit-row">${unitIcon(u)}
                <span class="unit-text"><span class="unit-title">${esc(dialogueText(u).title)}</span>
                <span class="unit-sub">${esc(unitText(u).title)}</span></span><span class="unit-count">${icon('forward')}</span></a>`)
              .join('')}</div>`
@@ -461,6 +465,7 @@ function settingsHtml() {
         ).join('')}
       </div>
       <p class="muted small">${t('acct.pace', { level: esc(levelText(LEVEL_BY_ID.get(CONVERSATIONAL)).title), when: weeksText(daysToLevel(CONVERSATIONAL, store.getCard, goal)) })}</p>
+      ${installSettingsHtml()}
     </section>`;
 }
 
@@ -567,7 +572,7 @@ function onboardingScreen() {
       <div class="ob-options grid-2">
         ${MOTIVATIONS.map(
           (m) => `<button type="button" class="ob-option ${ob.motivation === m ? 'selected' : ''}" data-why="${m}">
-            <span class="ob-flag">${t(`mot.icon.${m}`)}</span><span><b>${t(`mot.${m}`)}</b></span></button>`,
+            <span class="ob-flag">${icon(MOTIVATION_ICONS[m])}</span><span><b>${t(`mot.${m}`)}</b></span></button>`,
         ).join('')}
       </div>`,
     goal: `
@@ -662,6 +667,7 @@ function wireSettings() {
   document.querySelectorAll('.lang-seg [data-lang]').forEach((b) =>
     b.addEventListener('click', async () => {
       setLang(b.dataset.lang);
+      refreshNetBar();
       await store.setBaseLang(b.dataset.lang).catch((err) => alert(err.message));
       render();
     }),
@@ -866,22 +872,47 @@ store.subscribe(() => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') store.sync({ keepalive: true }).catch(() => {});
 });
-window.addEventListener('online', () => store.sync().catch(() => {}));
+window.addEventListener('online', () => {
+  store.sync().catch(() => {});
+  if (config.aiEnabled === null) loadConfig(); // it couldn't be fetched while offline
+});
+window.addEventListener('offline', () => {
+  if (location.hash.split('/')[1] === 'chat' && !stopSession) render(); // show the offline notice
+});
+
+// Install the app: the card's buttons, and redraw when the browser says it can (or did) install.
+const refreshNetBar = initOfflineBanner();
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-install]')) promptInstall();
+  const close = e.target.closest('[data-install-dismiss]');
+  if (close) {
+    dismissInstall();
+    close.closest('.install-card')?.remove();
+  }
+});
+onInstallChange(() => {
+  const route = location.hash.split('/')[1] || '';
+  if (!stopSession && !document.querySelector('.summary, .onboard') && (route === '' || route === 'account')) render();
+});
 
 render();
 store.refreshUser().then(() => {
   if (store.baseLang() && store.baseLang() !== getLang()) setLang(store.baseLang());
   if (!stopSession && !document.querySelector('.summary, .onboard')) render();
 });
-api('config')
-  .then((c) => {
-    config = { ...c, aiEnabled: c.aiEnabled ?? c.chatEnabled };
-    const route = location.hash.split('/')[1];
-    if ((route === 'chat' || route === 'translate') && !stopSession) render(); // AI availability is now known
-  })
-  .catch(() => {
-    config = { ...config, aiEnabled: false };
-  });
+function loadConfig() {
+  return api('config')
+    .then((c) => {
+      config = { ...c, aiEnabled: c.aiEnabled ?? c.chatEnabled };
+      const route = location.hash.split('/')[1];
+      if ((route === 'chat' || route === 'translate') && !stopSession) render(); // AI availability is now known
+    })
+    .catch((err) => {
+      // Offline: leave it unknown and try again when the connection returns.
+      if (err.status !== 0) config = { ...config, aiEnabled: false };
+    });
+}
+loadConfig();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {});

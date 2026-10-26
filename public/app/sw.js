@@ -1,7 +1,7 @@
 // Offline support. Network-first so a new deploy is picked up immediately;
 // the cache is only a fallback when there's no connection. API calls are never cached.
 
-const CACHE = 'learn-lingala-v6';
+const CACHE = 'learn-lingala-v7';
 const SHELL = [
   '/app/',
   '/app/app.css',
@@ -21,6 +21,7 @@ const SHELL = [
   '/app/js/i18n.js',
   '/app/js/course-fr.js',
   '/app/js/icons.js',
+  '/app/js/pwa.js',
   '/app/fonts/onest-latin.woff2',
   '/app/fonts/onest-latin-ext.woff2',
   '/app/fonts/unbounded-latin.woff2',

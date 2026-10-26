@@ -264,7 +264,8 @@ h3 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.015em; line-height
 }
 .float small { display: block; color: var(--muted); font-size: 12px; }
 .float-streak { left: 0; top: 40%; color: var(--ink); }
-.float-streak .fi { font-size: 22px; }
+.float-streak .fi { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--gold-50); color: #e8890c; }
+.float-streak .fi svg { width: 20px; height: 20px; }
 .float-local { right: 0; bottom: 14%; flex-direction: column; align-items: flex-start; gap: 3px; animation-delay: -3s; color: var(--ink); }
 .fl-lg { font-weight: 750; font-size: 17px; letter-spacing: -0.01em; }
 .tag-local { font-size: 10.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.07em; color: #8a5a00; background: var(--gold-50); border-radius: 999px; padding: 2px 8px; }
@@ -312,7 +313,8 @@ h3 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.015em; line-height
 .who-grid { display: grid; gap: 14px; }
 .who { background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--r); padding: 24px; transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease); }
 .who:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
-.who-ico { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: var(--brand-50); font-size: 22px; margin-bottom: 16px; }
+.who-ico { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: var(--brand-50); color: var(--brand); margin-bottom: 16px; }
+.who-ico svg, .fi svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .who p { color: var(--ink-2); margin-top: 0.5rem; font-size: 0.98rem; }
 @media (min-width: 640px) { .who-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 980px) { .who-grid { grid-template-columns: repeat(3, 1fr); gap: 18px; } }

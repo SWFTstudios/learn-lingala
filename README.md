@@ -34,8 +34,16 @@ A premium, app-like interface on every screen size:
 - **Phones:** sticky top bar with streak and XP, bottom tab bar (Learn, Review, Chat, Translate, Profile), full-screen lessons with a thumb-reachable answer bar.
 - **Desktop:** sidebar navigation, a centred content column, and a right panel with the daily-goal ring, streak week and the 5-level path.
 - Type: **Unbounded** for headlines, numbers and the wordmark, **Onest** for everything else. Both are self-hosted variable fonts, and both include ɛ, ɔ and correctly placed tone marks (few fonts do: check any replacement with the Lingala test phrase *Matɔ́ndɔ mingi*).
-- Colour: crisp cool neutrals, an emerald brand colour, an electric-lime accent on deep-green "stage" panels (landing hero, the app's Continue card, chat), gold for streaks. A custom SVG icon set, light and dark modes, and reduced-motion support.
+- Colour: crisp cool neutrals, an emerald brand colour, an electric-lime accent on deep-green "stage" panels (landing hero, the app's Continue card, chat), gold for streaks. A custom SVG icon set (each course unit has its own icon on a tile tinted by level; emoji are kept only for the chat partners' avatars), light and dark modes, and reduced-motion support.
 - **Onboarding:** pick your language, why you're learning, a daily goal, and whether to start from zero or test out of Level 1.
+
+## Offline & install
+
+The app is an installable web app (PWA). On the first visit the service worker saves the app and the whole course on the device; after that it opens without a connection.
+
+- **Works offline:** lessons, reviews, drills, checkpoints, streaks and the course dictionary. Progress is saved on the device and syncs to the account when the connection returns.
+- **Needs a connection:** live chat, AI translation and signing in. While offline, a small banner says so, and the AI buttons explain why they can't run instead of failing.
+- **Install:** on Chrome, Edge and Android the home screen shows an *Install* card (the browser's install prompt). On iPhone and iPad it shows the *Share → Add to Home Screen* steps. Installing matters most on iOS, where Safari can clear a website's saved data after about a week without a visit; an installed app keeps it. "Not now" hides the card for 30 days; the option stays in Profile.
 
 ## Live chat practice
 
@@ -98,6 +106,7 @@ public/            Static assets (Workers Static Assets, served from the edge ca
     js/i18n.js     Interface strings (English, French) and localized content helpers
     js/course-fr.js  French layer: meanings, notes, dialogues, levels, scenarios
     js/icons.js    SVG icon set
+    js/pwa.js      Offline banner and install prompt
     fonts/         Self-hosted Onest + Unbounded (SIL Open Font License)
     sw.js          Service worker (offline support, installable PWA)
 src/worker.js      API Worker: auth, sessions, progress sync
