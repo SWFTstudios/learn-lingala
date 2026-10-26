@@ -9,6 +9,8 @@ import {
   currentUnit, reviewStepFor, daysToLevel, NEW_PER_LESSON,
 } from '../public/app/js/lesson.js';
 import { hasIcon } from '../public/app/js/icons.js';
+import { breakdown, unknownWords } from '../public/app/js/breakdown.js';
+import { deckItems, lookAlikes, contextLines, TRICKY_LAPSES } from '../public/app/js/study.js';
 
 const noFuzz = () => 0.5;
 const learnedCard = (id, now) => ({ ...newCard(id, now), reps: 2, interval: 3, last: now - 4 * DAY, due: now - DAY });
@@ -265,7 +267,13 @@ test('UI strings: every key used in the app exists in every language', () => {
   for (const g of [10, 20, 30, 50]) used.add(`goal.${g}`).add(`goal.name.${g}`);
   for (const m of ['travel', 'family', 'music', 'friends', 'work', 'curious']) used.add(`mot.${m}`).add(`mot.line.${m}`);
   for (const c of ['high', 'medium', 'low']) used.add(`tr.conf.${c}`);
-  for (const r of ['learn', 'unit', 'level', 'review', 'chat', 'translate', 'phrases', 'account']) used.add(`title.${r}`);
+  for (const r of ['learn', 'unit', 'level', 'review', 'chat', 'translate', 'phrases', 'account', 'study', 'card']) used.add(`title.${r}`);
+  for (const d of ['due', 'weak', 'tricky', 'recent', 'all']) used.add(`study.deck.${d}`).add(`study.deckSub.${d}`);
+  for (const f of ['ln', 'base', 'mix']) used.add(`study.front.${f}`);
+  for (const c of ['none', 'think', 'sure']) used.add(`study.conf.${c}`);
+  for (const g of [0, 1, 2, 3]) used.add(`study.grade.${g}`);
+  for (const k of ['pretest', 'hyper', 'hook', 'notes', 'confuse', 'spacing']) used.add(`study.sci.${k}`);
+  for (const p of ['prog', 'have', 'neg', 'poss', 'dont', 'respect', 'each', 'chain']) used.add(`bd.pat.${p}`);
   for (const e of ['busy', 'unavailable', 'connection', 'refused', 'muddled', 'quota', 'too-long', 'off']) used.add(`aiErr.${e}`);
 
   for (const key of used) assert.ok(hasKey(key, 'en'), `missing English string ${key}`);
@@ -278,4 +286,51 @@ test('UI strings: every key used in the app exists in every language', () => {
 
 test('every unit has an icon from the icon set', () => {
   for (const unit of COURSE) assert.ok(unit.icon && hasIcon(unit.icon), `unit ${unit.id} has no valid icon`);
+});
+
+test('breakdown: every word of every course phrase is in the lexicon', () => {
+  for (const item of ITEMS) {
+    for (const text of [item.lg, ...(item.alt || [])]) {
+      assert.deepEqual(unknownWords(text), [], `unknown word in "${text}" (${item.id})`);
+    }
+  }
+});
+
+test('breakdown: verb pieces join back into the word, and each piece has a meaning', () => {
+  for (const item of ITEMS) {
+    for (const w of breakdown(item.lg).words) {
+      if (!w.pieces) continue;
+      assert.equal(normalize(w.pieces.map((p) => p.m).join('')), normalize(w.word), `${w.word} (${item.id})`);
+      for (const p of w.pieces) if (p.kind !== 'end') assert.ok(p.g, `piece ${p.m} of ${w.word} has no gloss`);
+    }
+  }
+  const [nalingi] = breakdown('Nalingi').words;
+  assert.deepEqual(nalingi.pieces.map((p) => p.m), ['na', 'ling', 'i']);
+  assert.ok(breakdown('Nazali kolia te').patterns.includes('prog'));
+  assert.ok(breakdown('Nazali kolia te').patterns.includes('neg'));
+  assert.ok(breakdown('mama na ngai').patterns.includes('poss'));
+  assert.ok(breakdown('Kobanga te').patterns.includes('dont'));
+});
+
+test('study decks: due, tricky and unit decks pick the right cards', () => {
+  const now = Date.now();
+  const cards = {
+    'g-mbote': { ...learnedCard('g-mbote', now), due: now - DAY },
+    'g-te': { ...learnedCard('g-te', now), due: now + 5 * DAY, lapses: TRICKY_LAPSES },
+  };
+  const get = (id) => cards[id];
+  assert.deepEqual(deckItems('due', get, now, noFuzz).map((i) => i.id), ['g-mbote']);
+  assert.deepEqual(deckItems('tricky', get, now, noFuzz).map((i) => i.id), ['g-te']);
+  assert.equal(deckItems('unit:greetings', get, now, noFuzz).length, UNITS.find((u) => u.id === 'greetings').items.length);
+  assert.deepEqual(deckItems('nope', get, now), []);
+});
+
+test('study cards: look-alikes and conversation lines', () => {
+  for (const item of ITEMS) {
+    const alike = lookAlikes(item);
+    assert.ok(alike.length <= 3);
+    assert.ok(!alike.some((o) => o.id === item.id));
+  }
+  const olei = ITEMS.find((i) => i.id === 'fd-olei');
+  assert.ok(contextLines(olei).length > 0, 'Olei? appears in a course conversation');
 });

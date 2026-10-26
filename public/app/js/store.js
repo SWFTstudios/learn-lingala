@@ -9,13 +9,17 @@ const KEY = 'll-state-v1';
 function blank() {
   return {
     cards: {}, dirty: [], events: [], serverDays: {}, goal: 20, user: null, lastSync: 0,
+    // Learner's own notes and memory hooks per phrase ({ text, hook, updatedAt }), synced like cards.
+    notes: {}, dirtyNotes: [],
+    // Study cards: confidence calibration ({ sure: [asked, right], … }) and which side shows first.
+    calibration: {}, studyFront: 'ln',
     // Device preferences (kept on sign-out).
     baseLang: null, onboarded: false, motivation: null,
   };
 }
 
-// What survives signing out: the device's language and onboarding.
-const devicePrefs = () => ({ baseLang: state.baseLang, onboarded: state.onboarded, motivation: state.motivation });
+// What survives signing out: the device's language, onboarding and study preference.
+const devicePrefs = () => ({ baseLang: state.baseLang, onboarded: state.onboarded, motivation: state.motivation, studyFront: state.studyFront });
 
 let state = load();
 const listeners = new Set();
@@ -54,6 +58,35 @@ export function putCards(cards) {
   }
   save();
 }
+
+// --- Notes ----------------------------------------------------------------------
+
+export const NOTE_MAX = 1000;
+export const HOOK_MAX = 400;
+
+export const getNote = (id) => state.notes[id] ?? null;
+
+export function putNote(id, { text = '', hook = '' }) {
+  state.notes[id] = { text: String(text).slice(0, NOTE_MAX), hook: String(hook).slice(0, HOOK_MAX), updatedAt: Date.now() };
+  if (!state.dirtyNotes.includes(id)) state.dirtyNotes.push(id);
+  save();
+}
+
+// --- Study cards ----------------------------------------------------------------
+
+export const studyFront = () => state.studyFront;
+export function setStudyFront(front) {
+  state.studyFront = front;
+  save();
+}
+
+// How often each confidence level turns out right ("sure" should be right almost always).
+export function recordConfidence(level, right) {
+  const [asked = 0, ok = 0] = state.calibration[level] ?? [];
+  state.calibration[level] = [asked + 1, ok + (right ? 1 : 0)];
+  save();
+}
+export const calibration = () => state.calibration;
 
 // --- XP, goal, streak ---------------------------------------------------------
 
@@ -139,6 +172,7 @@ export async function signedIn(u) {
   state.onboarded = true;
   await reconcileLang(u);
   state.dirty = Object.keys(state.cards);
+  state.dirtyNotes = Object.keys(state.notes);
   save();
   await sync();
 }
@@ -190,7 +224,8 @@ export function sync({ keepalive = false } = {}) {
       const sentIds = [...state.dirty];
       const sentCards = sentIds.map((id) => state.cards[id]).filter(Boolean);
       const sentEvents = [...state.events];
-      const res = await api('sync', { method: 'POST', body: { cards: sentCards, xpEvents: sentEvents }, keepalive });
+      const sentNotes = state.dirtyNotes.map((id) => state.notes[id] && { id, ...state.notes[id] }).filter(Boolean);
+      const res = await api('sync', { method: 'POST', body: { cards: sentCards, xpEvents: sentEvents, notes: sentNotes }, keepalive });
 
       // Cards changed locally while the request was in flight stay dirty and local.
       const changedSince = state.dirty.filter((id) => state.cards[id] !== sentCards.find((c) => c.id === id));
@@ -199,6 +234,15 @@ export function sync({ keepalive = false } = {}) {
       for (const id of changedSince) cards[id] = state.cards[id];
       state.cards = cards;
       state.dirty = changedSince;
+
+      if (res.notes) {
+        const notesChanged = state.dirtyNotes.filter((id) => state.notes[id]?.updatedAt !== sentNotes.find((n) => n.id === id)?.updatedAt);
+        const notes = {};
+        for (const n of res.notes) notes[n.id] = { text: n.text, hook: n.hook, updatedAt: n.updatedAt };
+        for (const id of notesChanged) notes[id] = state.notes[id];
+        state.notes = notes;
+        state.dirtyNotes = notesChanged;
+      }
 
       const accepted = new Set(res.acceptedEventIds);
       state.events = state.events.filter((e) => !accepted.has(e.id));
@@ -218,4 +262,4 @@ export function sync({ keepalive = false } = {}) {
   return syncing;
 }
 
-export const hasUnsynced = () => state.dirty.length > 0 || state.events.length > 0;
+export const hasUnsynced = () => state.dirty.length > 0 || state.events.length > 0 || state.dirtyNotes.length > 0;

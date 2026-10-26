@@ -45,6 +45,33 @@ The app is an installable web app (PWA). On the first visit the service worker s
 - **Needs a connection:** live chat, AI translation and signing in. While offline, a small banner says so, and the AI buttons explain why they can't run instead of failing.
 - **Install:** on Chrome, Edge and Android the home screen shows an *Install* card (the browser's install prompt). On iPhone and iPad it shows the *Share → Add to Home Screen* steps. Installing matters most on iOS, where Safari can clear a website's saved data after about a week without a visit; an installed app keeps it. "Not now" hides the card for 30 days; the option stays in Profile.
 
+## Study cards
+
+Flip cards for every phrase, reached from **Review** (decks: *Due now*, *Weak spots*, *Tricky cards*, *Recently learned*, *Shuffle all*), from each unit page, or by tapping any phrase in a unit or the dictionary.
+
+The back of each card shows:
+
+- **Word by word:** every word glossed, verbs split into their pieces (*na·ling·i* = I · want · now, *to·ko·mon·an·a* = we · will · see · each other · …), the infinitive they come from, and noun plurals (*moto → bato*). Grammar patterns are called out (*zali + ko-verb* = …-ing, *zali na* = have/feel, *te* = not, *noun + na + person* = possession). The breakdowns come from a hand-written lexicon in [`breakdown.js`](public/app/js/breakdown.js), so they work offline and are never AI-generated; `npm test` fails if a course phrase has a word the lexicon doesn't know.
+- **In a conversation:** the phrase in lines from the course dialogues.
+- **Don't confuse with:** look-alike phrases (*Nalingi yo* / *Nalingi te*).
+- **Memory strength:** estimated chance of recalling it now, and when it's next due.
+- **My notes and memory hook:** the learner's own words, saved on the device and synced to the account like progress. Signed-in learners can ask for an AI **memory hook** (`POST /api/hook`, [`src/hook.js`](src/hook.js), Claude Sonnet 5.5, 30 a day): a sound-alike keyword in their language tied to the meaning.
+
+What makes them different, and the research behind each part:
+
+| Feature | Why |
+| --- | --- |
+| **Commit before you flip:** "No idea / I think so / Sure" before seeing the answer | Attempting recall first, even wrongly, improves learning (pretesting effect; Richland, Kornell & Kao, 2009) |
+| **Sure-but-wrong boost:** a confident miss gets a short explanation and comes back within a few cards | High-confidence errors are the most easily corrected (hypercorrection effect; Butterfield & Metcalfe, 2001) |
+| **Calibration:** "When you say Sure, you're right 92% of the time" | Knowing what you know (metacognition) helps learners spend time where it's needed |
+| **Memory hooks** | Keyword mnemonics boost vocabulary recall (Atkinson & Raugh, 1975) |
+| **Your own notes** | Self-generated material is remembered better than material you only read (generation effect; Slamecka & Graf, 1978) |
+| **Look-alikes side by side** | Comparing similar items trains discrimination (Kornell & Bjork, 2008) |
+| **Tricky cards (missed 3+ times)** | Anki calls these leeches; here they get their own deck and a nudge to add a hook |
+| **Meaning-first mode** | Producing the Lingala is harder than recognising it, and builds stronger memories |
+
+Every rating feeds the same spaced-repetition schedule as lessons and reviews.
+
 ## Live chat practice
 
 The **Chat** tab is a text conversation with a Lingala speaker in character: Mama Nzeba the neighbour, a market seller, a taxi driver, a cousin, a friend from Matonge, a respected elder, or open conversation. Most partners come with a **mission** ("get the plantain price down"), because practising real tasks builds conversation faster than open chat.
@@ -107,11 +134,14 @@ public/            Static assets (Workers Static Assets, served from the edge ca
     js/course-fr.js  French layer: meanings, notes, dialogues, levels, scenarios
     js/icons.js    SVG icon set
     js/pwa.js      Offline banner and install prompt
+    js/study.js    Study cards: decks, sessions, card back, notes
+    js/breakdown.js  Word-by-word lexicon (English, French) and verb analyser
     fonts/         Self-hosted Onest + Unbounded (SIL Open Font License)
     sw.js          Service worker (offline support, installable PWA)
 src/worker.js      API Worker: auth, sessions, progress sync
 src/chat.js        Chat endpoint: prompt and conversation rules
 src/translate.js   Translate endpoint
+src/hook.js        Memory hooks for study cards
 src/claude.js      Shared Claude API call: JSON output, refusal fallbacks, errors, daily quotas
 migrations/        D1 schema
 tests/             Unit tests for the learning logic
