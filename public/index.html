@@ -2,108 +2,413 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Learn Lingala — Tóyekola Lingála!</title>
-  <meta name="description" content="Learn Lingala from scratch: the alphabet, pronunciation, and basic sentence structure.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗣️</text></svg>">
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Learn Lingala — speak it like you grew up in Kinshasa</title>
+  <meta name="description" content="Go from your first “Mbote” to real conversations in Lingala. Short daily lessons, AI conversation partners, a voice translator and the Kinshasa expressions textbooks skip. Free to start, in English or French.">
+  <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0c0b" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Learn Lingala — speak it like you grew up in Kinshasa">
+  <meta property="og:description" content="Short daily lessons, AI conversation partners and real Kinshasa expressions. Free to start.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/app/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/app/icons/icon-192.png">
+  <link rel="preload" href="/app/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/landing.css">
 </head>
 <body>
-  <header class="site-header">
-    <nav class="nav">
-      <a href="index.html" class="brand">Learn<span>Lingala</span></a>
-      <div class="nav-links">
-        <a href="alphabet.html">Alphabet</a>
-        <a href="sentences.html">Sentences</a>
-        <a href="/app/" class="nav-app">Open app</a>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <div class="wrap nav-inner">
+      <a href="/" class="brand" aria-label="Learn Lingala home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--brand)"/>
+          <path d="M8 10.5h16a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-8l-4.5 3.5V21.5H8A2.5 2.5 0 0 1 5.5 19v-6A2.5 2.5 0 0 1 8 10.5z" fill="var(--on-brand)"/>
+          <circle cx="24.5" cy="9" r="3.5" fill="var(--gold)"/></svg>
+        <span>Learn <b>Lingala</b></span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#path">The path</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav-cta">
+        <a href="/app/#/account/login" class="link-quiet" data-signin>Sign in</a>
+        <a href="/app/" class="btn btn-primary btn-sm" data-start>Start free</a>
       </div>
-    </nav>
+    </div>
   </header>
 
-  <main>
+  <main id="main">
+    <!-- Hero ------------------------------------------------------------------ -->
     <section class="hero">
-      <p class="hero-greeting">Mbote! 👋</p>
-      <h1>Tóyekola Lingála<br><span class="muted">Let's learn Lingala</span></h1>
-      <p class="hero-sub">
-        Lingala is a Bantu language spoken by more than 40 million people across the
-        Democratic Republic of the Congo, the Republic of the Congo, and beyond.
-        Start from zero — the alphabet, sounds, and your first sentences.
-      </p>
-      <a class="btn btn-primary" href="/app/">Open the learning app →</a>
-      <p class="hero-alt">Free · works on your phone · <a href="alphabet.html">or start with the alphabet guide</a></p>
-    </section>
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="pill"><span class="dot" aria-hidden="true"></span> Spoken by 40+ million people across the Congos</p>
+          <h1>Speak Lingala like you <em>grew up in Kinshasa.</em></h1>
+          <p class="lede">From your first <span lang="ln">“Mbote”</span> to real conversations with family, friends and the whole city. Five-minute lessons, AI conversation partners that reply in real time, and the street expressions textbooks never teach.</p>
+          <div class="hero-actions">
+            <a href="/app/" class="btn btn-primary btn-lg" data-start>Start learning free <span aria-hidden="true">→</span></a>
+            <a href="#how" class="btn btn-ghost btn-lg">See how it works</a>
+          </div>
+          <ul class="trust">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg> No credit card</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg> In English or French</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg> Works on your phone, even offline</li>
+          </ul>
+        </div>
 
-    <section class="builder-section">
-      <h2>Build a sentence right now</h2>
-      <p class="section-sub">
-        Lingala verbs carry their subject as a prefix. Pick the pieces and watch a real
-        sentence assemble itself — this is the whole engine of the language.
-      </p>
-      <div class="builder">
-        <div class="builder-controls">
-          <div class="builder-field">
-            <label for="b-subject">Who?</label>
-            <select id="b-subject"></select>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="phone">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="pc-head">
+                <span class="pc-avatar">👵🏾</span>
+                <span class="pc-who"><b>Mama Nzeba</b><small><i></i>Your neighbour · Kinshasa</small></span>
+              </div>
+              <div class="pc-mission"><b>Mission</b> Greet her, say how you are, ask how she is.</div>
+              <div class="pc-log" id="demo-log">
+                <div class="pc-msg them"><span lang="ln">Mbote! Ozali malamu?</span><small>Hello! How are you?</small></div>
+                <div class="pc-msg you"><span lang="ln">Mbote mama! Nazali malamu.</span></div>
+                <div class="pc-fb"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></svg> <span><b>Natural!</b> That's exactly how you'd greet a neighbour.</span></div>
+                <div class="pc-msg them"><span lang="ln">Ah, malamu! Olei?</span><small>Ah, good! Have you eaten?</small></div>
+                <div class="pc-typing"><i></i><i></i><i></i></div>
+              </div>
+              <div class="pc-suggest"><span lang="ln">Ɛɛ, nalei</span><span lang="ln">Naino te</span></div>
+            </div>
           </div>
-          <div class="builder-field">
-            <label for="b-verb">Does what?</label>
-            <select id="b-verb"></select>
-          </div>
-          <div class="builder-field">
-            <label for="b-object">To what?</label>
-            <select id="b-object"></select>
-          </div>
-          <div class="builder-field builder-toggle">
-            <label for="b-negate">Say “not”?</label>
-            <button type="button" id="b-negate" class="toggle" aria-pressed="false">+ te</button>
-          </div>
+          <div class="float float-streak"><span class="fi">🔥</span><span><b>12-day streak</b><small>Goal met today</small></span></div>
+          <div class="float float-local"><span class="tag-local">Sounds local</span><span lang="ln" class="fl-lg">Ya solo?</span><small>Really? / For real?</small></div>
         </div>
-        <div class="builder-output">
-          <div class="builder-lingala" id="b-lingala"></div>
-          <div class="builder-breakdown" id="b-breakdown"></div>
-          <div class="builder-english" id="b-english"></div>
-        </div>
-        <p class="builder-hint">
-          The pattern: <strong>subject prefix + verb stem + -i</strong>, and <strong>te</strong>
-          at the end makes it negative. <a href="sentences.html">See the full lesson →</a>
-        </p>
       </div>
     </section>
 
-    <section class="flashcards-section">
-      <h2>Your first words</h2>
-      <p class="section-sub">Tap a card to flip it. Tap again to flip it back.</p>
-      <div class="flashcards" id="flashcards"></div>
+    <!-- Numbers ---------------------------------------------------------------- -->
+    <section class="stats" aria-label="What's inside">
+      <div class="wrap stats-grid">
+        <div><b>5</b><span>levels, from zero to B1</span></div>
+        <div><b>227</b><span>real phrases, not word lists</span></div>
+        <div><b>7</b><span>AI conversation partners</span></div>
+        <div><b>34</b><span>“sounds local” expressions</span></div>
+      </div>
     </section>
 
-    <section class="lesson-grid-section">
-      <h2>Lessons</h2>
-      <div class="lesson-grid">
-        <a class="lesson-card" href="alphabet.html">
-          <div class="lesson-num">Lesson 1</div>
-          <h3>The Alphabet &amp; Sounds</h3>
-          <p>The 7 vowels, the consonants, and the special letter pairs like <strong>mb</strong>, <strong>nd</strong>, and <strong>ng</strong> that give Lingala its rhythm.</p>
-          <span class="lesson-cta">Begin →</span>
-        </a>
-        <a class="lesson-card" href="sentences.html">
-          <div class="lesson-num">Lesson 2</div>
-          <h3>Basic Sentence Structure</h3>
-          <p>How Lingala sentences are built: word order, pronouns, verb prefixes, and saying your first real sentences.</p>
-          <span class="lesson-cta">Begin →</span>
-        </a>
-        <div class="lesson-card lesson-card-soon">
-          <div class="lesson-num">Coming soon</div>
-          <h3>Greetings &amp; Everyday Phrases</h3>
-          <p>Mbote, ozali malamu? Small talk, courtesy, and the phrases you'll use every day.</p>
+    <!-- Who it's for ------------------------------------------------------------ -->
+    <section class="section" id="who">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="kicker">Why people come here</p>
+          <h2>Everyone has a reason. The goal is the same: <span class="hl">be understood.</span></h2>
+          <p class="sub">Lingala is the language of Kinshasa and Brazzaville, of the river, the markets and the music. However you got here, the app is built around the moment you'll actually use it.</p>
+        </header>
+        <div class="who-grid">
+          <article class="who reveal">
+            <span class="who-ico">🏡</span>
+            <h3>Reconnecting with family</h3>
+            <p>Grew up hearing it but answering in English or French? Finally talk with your parents, grandparents and cousins in the language of home.</p>
+          </article>
+          <article class="who reveal">
+            <span class="who-ico">💍</span>
+            <h3>Partners &amp; in-laws</h3>
+            <p>Greet your in-laws properly, show respect to elders the Congolese way, and follow the conversation at the next family celebration.</p>
+          </article>
+          <article class="who reveal">
+            <span class="who-ico">✈️</span>
+            <h3>Travelling to the Congo</h3>
+            <p>Taxis, markets, prices and directions in your first weeks, so you land in Kinshasa ready to get around, haggle and make friends.</p>
+          </article>
+          <article class="who reveal">
+            <span class="who-ico">🎶</span>
+            <h3>Rumba &amp; music lovers</h3>
+            <p>Congolese rumba is on UNESCO's list of humanity's cultural heritage. Understand what Franco, Koffi and Fally are actually singing about.</p>
+          </article>
+          <article class="who reveal">
+            <span class="who-ico">🤝</span>
+            <h3>Work &amp; service</h3>
+            <p>NGO, church, health or business work in the region? Build trust by speaking the language people use every day, not just French.</p>
+          </article>
+          <article class="who reveal">
+            <span class="who-ico">🧭</span>
+            <h3>Curious language lovers</h3>
+            <p>Bored of the usual options? A Bantu language with tones, elegant verb prefixes and a huge, lively community is a brilliant next challenge.</p>
+          </article>
         </div>
+      </div>
+    </section>
+
+    <!-- How it works ----------------------------------------------------------- -->
+    <section class="section section-alt" id="how">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="kicker">How it works</p>
+          <h2>Five minutes a day. A method built on how people actually learn languages.</h2>
+          <p class="sub">No grammar lectures and no endless vocabulary lists. Each daily session moves you through the same four steps that research on language learning keeps pointing to.</p>
+        </header>
+        <ol class="steps">
+          <li class="step reveal">
+            <span class="step-n">1</span>
+            <h3>Learn whole phrases</h3>
+            <p>Fluent speakers rely on ready-made chunks like <b lang="ln">Likambo te</b> and <b lang="ln">Kaka bongo</b>. You learn the phrases people really say, each one in a real-life dialogue.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-n">2</span>
+            <h3>Crack the patterns</h3>
+            <p>Pattern drills turn <b lang="ln">Nasali</b> into <b lang="ln">Nakosala</b>, “I” into “we”, a friend into an elder. You learn the rule once, then build sentences you've never seen.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-n">3</span>
+            <h3>Use it in conversation</h3>
+            <p>Role-play the market, a taxi, a family visit. Then chat live with AI partners who reply in Lingala, correct you gently and give you a mission to complete.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-n">4</span>
+            <h3>Never forget it</h3>
+            <p>Spaced repetition brings each phrase back right before you'd forget it: tomorrow, then in 3 days, a week, a month. What you learn stays learned.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Try it ------------------------------------------------------------------ -->
+    <section class="section" id="try">
+      <div class="wrap try-grid">
+        <div class="reveal">
+          <p class="kicker">Try it right now</p>
+          <h2>Lingala is easier than you think.</h2>
+          <p class="sub">Verbs carry their subject as a prefix: <b lang="ln">na-</b> is “I”, <b lang="ln">to-</b> is “we”. Add <b lang="ln">te</b> to say “not”. Pick the pieces and you're already making real sentences. This is the engine of the whole language.</p>
+          <a href="/app/" class="btn btn-primary" data-start>Keep going in the app <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="builder reveal">
+          <div class="builder-controls">
+            <label>Who?<select id="b-subject"></select></label>
+            <label>Does what?<select id="b-verb"></select></label>
+            <label>To what?<select id="b-object"></select></label>
+            <button type="button" id="b-negate" class="toggle" aria-pressed="false">Add “not” <b lang="ln">te</b></button>
+          </div>
+          <div class="builder-output" aria-live="polite">
+            <div class="builder-lg" id="b-lingala" lang="ln"></div>
+            <div class="builder-parts" id="b-breakdown"></div>
+            <div class="builder-en" id="b-english"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features (bento) --------------------------------------------------------- -->
+    <section class="section section-alt" id="features">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="kicker">What makes it different</p>
+          <h2>Everything you need to go from tourist to <span lang="ln" class="hl">mwana mboka.</span></h2>
+          <p class="sub"><span lang="ln">Mwana mboka</span> means “child of the country”, a real local. It's the compliment this app is built to earn you.</p>
+        </header>
+
+        <div class="bento">
+          <article class="tile tile-chat reveal">
+            <div class="tile-copy">
+              <span class="tile-tag">Live chat practice</span>
+              <h3>Conversation partners, any time of day</h3>
+              <p>Text with Mama Nzeba next door, haggle with a market seller, direct a taxi driver, catch up with a friend from Matonge. Each reply comes with feedback on what you wrote and suggestions if you're stuck.</p>
+            </div>
+            <div class="mini-chat" aria-hidden="true">
+              <div class="pc-msg them"><span lang="ln">Ndeko, ndenge nini?</span><small>Bro, what's up?</small></div>
+              <div class="pc-msg you"><span lang="ln">Nazali malamu.</span></div>
+              <div class="pc-fb ok"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg> <span>With a friend, try: <b lang="ln">Sango te, ndeko!</b></span></div>
+            </div>
+          </article>
+
+          <article class="tile tile-translate reveal">
+            <span class="tile-tag">Translate &amp; dictionary</span>
+            <h3>Say it in your language. Get the Lingala.</h3>
+            <p>Speak or type a phrase. You get the translation, alternatives and a word-by-word breakdown, so you learn, not just copy.</p>
+            <div class="mini-tr" aria-hidden="true">
+              <div class="tr-in"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg> I'm hungry</div>
+              <div class="tr-out"><b lang="ln">Nazali na nzala</b><small><span lang="ln">nazali</span> I am · <span lang="ln">na</span> with · <span lang="ln">nzala</span> hunger</small></div>
+            </div>
+          </article>
+
+          <article class="tile tile-local reveal">
+            <span class="tile-tag">Sounds local</span>
+            <h3>The Lingala people really speak</h3>
+            <p>Kinshasa slang, the French that Kinois mix in, and the respect forms that make elders smile.</p>
+            <ul class="pairs">
+              <li><span>Textbook</span><b lang="ln">Ozali malamu?</b><span class="arrow" aria-hidden="true">→</span><span>Kinshasa</span><b lang="ln">Ndenge nini?</b></li>
+              <li><span>Textbook</span><b lang="ln">Matɔ́ndɔ</b><span class="arrow" aria-hidden="true">→</span><span>Kinshasa</span><b lang="ln">Merci mingi</b></li>
+              <li><span>To a friend</span><b lang="ln">Ozali malamu?</b><span class="arrow" aria-hidden="true">→</span><span>To an elder</span><b lang="ln">Bozali malamu?</b></li>
+            </ul>
+          </article>
+
+          <article class="tile tile-srs reveal">
+            <span class="tile-tag">Spaced repetition</span>
+            <h3>Reviews timed by memory science</h3>
+            <div class="srs" aria-hidden="true">
+              <span style="--h:30%">1d</span><span style="--h:46%">3d</span><span style="--h:64%">1w</span><span style="--h:82%">1m</span><span style="--h:100%">∞</span>
+            </div>
+          </article>
+
+          <article class="tile tile-test reveal">
+            <span class="tile-tag">Checkpoints</span>
+            <h3>Already know some? Test out.</h3>
+            <p>Score 80% on a level checkpoint and skip ahead. No wasted time on what you know.</p>
+          </article>
+
+          <article class="tile tile-habit reveal">
+            <span class="tile-tag">Built for habit</span>
+            <h3>Streaks, daily goals &amp; a finish date</h3>
+            <p>Pick 5 to 25 minutes a day. The app shows when you'll reach real conversations at your pace.</p>
+          </article>
+
+          <article class="tile tile-lang reveal">
+            <span class="tile-tag">Your language</span>
+            <h3>Learn from English or French</h3>
+            <p>The whole app, every meaning, note and correction, in the language you think in.</p>
+          </article>
+
+          <article class="tile tile-offline reveal">
+            <span class="tile-tag">Anywhere</span>
+            <h3>Phone, tablet or laptop. Online or off.</h3>
+            <p>Install it like an app. Lessons work offline and your progress syncs to your account.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- The path ---------------------------------------------------------------- -->
+    <section class="section" id="path">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="kicker">The path to conversational</p>
+          <h2>A clear plan from zero to real conversations in about three months.</h2>
+          <p class="sub">Five levels mapped to the international CEFR scale. Each one ends with things you can actually <em>do</em>, not chapters you've finished. Times assume about 10 minutes a day.</p>
+        </header>
+        <ol class="path">
+          <li class="lvl reveal">
+            <div class="lvl-top"><span class="lvl-n">1</span><span class="lvl-time">Weeks 1–3 · A0 → A1</span></div>
+            <h3>Arrive <small>Survival Lingala</small></h3>
+            <ul><li>Greet anyone and ask how they are</li><li>Say you don't understand, ask people to slow down</li><li>Count, ask prices and haggle at the market</li></ul>
+          </li>
+          <li class="lvl reveal">
+            <div class="lvl-top"><span class="lvl-n">2</span><span class="lvl-time">Weeks 3–6 · A1</span></div>
+            <h3>Get around <small>Food, taxis &amp; directions</small></h3>
+            <ul><li>Order food and say you're hungry</li><li>Take a taxi and give directions</li><li>Ask who, what, where, when and why</li></ul>
+          </li>
+          <li class="lvl reveal">
+            <div class="lvl-top"><span class="lvl-n">3</span><span class="lvl-time">Weeks 6–10 · A1 → A2</span></div>
+            <h3>Daily life <small>Family, actions &amp; feelings</small></h3>
+            <ul><li>Talk about your family</li><li>Say what you're doing and what you will do</li><li>Say what you want, can and can't do</li></ul>
+          </li>
+          <li class="lvl lvl-goal reveal">
+            <div class="lvl-top"><span class="lvl-n">4</span><span class="lvl-time">Weeks 10–14 · A2 → B1</span></div>
+            <h3>Conversations <small>Past, plans &amp; small talk</small></h3>
+            <ul><li>Tell what happened yesterday or long ago</li><li>Make plans and invite people out</li><li>Hold a 5-minute small-talk conversation</li></ul>
+            <span class="lvl-badge">You're conversational</span>
+          </li>
+          <li class="lvl lvl-local reveal">
+            <div class="lvl-top"><span class="lvl-n">5</span><span class="lvl-time">Ongoing · B1</span></div>
+            <h3><span lang="ln">Mwana mboka</span> <small>Sound like a local</small></h3>
+            <ul><li>React naturally: <span lang="ln">“Ya solo?”, “Kaka bongo”</span></li><li>Use everyday Kinshasa street expressions</li><li>Show respect to elders the Congolese way</li></ul>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Comparison ---------------------------------------------------------------- -->
+    <section class="section section-alt" id="compare">
+      <div class="wrap compare-wrap">
+        <header class="section-head reveal">
+          <p class="kicker">Why not just use…</p>
+          <h2>Most language apps don't teach Lingala. Phrasebooks don't teach conversation.</h2>
+        </header>
+        <div class="table-scroll reveal">
+          <table class="compare">
+            <thead>
+              <tr><th scope="col"><span class="sr">Feature</span></th><th scope="col" class="us">Learn Lingala</th><th scope="col">Phrasebooks &amp; videos</th><th scope="col">Big language apps</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Teaches Lingala</th><td class="us yes">Yes</td><td class="yes">Yes</td><td class="no">Rarely</td></tr>
+              <tr><th scope="row">Step-by-step path to conversation</th><td class="us yes">Yes</td><td class="no">No</td><td class="yes">Yes</td></tr>
+              <tr><th scope="row">Live conversation practice, 24/7</th><td class="us yes">Yes</td><td class="no">No</td><td class="part">Some</td></tr>
+              <tr><th scope="row">Kinshasa slang &amp; respect forms</th><td class="us yes">Yes</td><td class="part">Some</td><td class="no">No</td></tr>
+              <tr><th scope="row">Reviews before you forget</th><td class="us yes">Yes</td><td class="no">No</td><td class="yes">Yes</td></tr>
+              <tr><th scope="row">Voice translator with breakdowns</th><td class="us yes">Yes</td><td class="no">No</td><td class="no">No</td></tr>
+              <tr><th scope="row">Free to start</th><td class="us yes">Yes</td><td class="yes">Often</td><td class="part">Varies</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ ------------------------------------------------------------------------ -->
+    <section class="section" id="faq">
+      <div class="wrap faq-wrap">
+        <header class="section-head reveal">
+          <p class="kicker">Questions</p>
+          <h2>Good questions, honest answers.</h2>
+        </header>
+        <div class="faq reveal">
+          <details>
+            <summary>How fast will I be able to have a conversation?</summary>
+            <p>The course is designed to get you to small-talk conversations (Level 4, around A2–B1) in about three months at 10 minutes a day. Everyone's pace differs, so the app shows your own estimated date based on how often you practise.</p>
+          </details>
+          <details>
+            <summary>Is it really free?</summary>
+            <p>Yes. You can start right now, with no card and no trial timer. Lessons, reviews and the phrasebook work without an account. Create a free account to save your progress across devices and to use live chat and AI translation.</p>
+          </details>
+          <details>
+            <summary>Which Lingala does it teach?</summary>
+            <p>Everyday Lingala as it's spoken in Kinshasa, including the French words Kinois mix in, plus respectful forms for elders. Usage varies between Kinshasa, Brazzaville and other regions, and the app points out common variants.</p>
+          </details>
+          <details>
+            <summary>Can I learn from French instead of English?</summary>
+            <p>Yes. Choose English or French when you start, and switch any time in your profile. All meanings, grammar notes, dialogues, chat feedback and translations follow your choice.</p>
+          </details>
+          <details>
+            <summary>Is there audio?</summary>
+            <p>Native-speaker audio is on the way. For now, every lesson has you say phrases out loud, and the pronunciation guide teaches the sounds (Lingala is spelled the way it sounds, which helps a lot). The translator accepts your voice in English or French.</p>
+          </details>
+          <details>
+            <summary>How accurate are the AI chat and translations?</summary>
+            <p>The course phrases are written and checked by hand. Chat partners and AI translations are powered by Claude and told to use only Lingala they're confident in, and every translation shows a confidence level. AI can still make mistakes, so check anything surprising with a native speaker.</p>
+          </details>
+          <details>
+            <summary>I already speak some Lingala. Will I be bored?</summary>
+            <p>No. Take a level checkpoint and test out. Score 80% and you skip ahead, with those phrases added to your reviews so they stay fresh.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA ------------------------------------------------------------------- -->
+    <section class="final">
+      <div class="wrap final-inner reveal">
+        <p class="final-greet" lang="ln">Tóyekola Lingála!</p>
+        <h2>Join the 40+ million people who speak Lingala.</h2>
+        <p>Your first lesson takes five minutes. By the end of it you'll greet someone, ask how they are, and understand the answer.</p>
+        <a href="/app/" class="btn btn-gold btn-lg" data-start>Start learning free <span aria-hidden="true">→</span></a>
+        <p class="final-small">No card · English or French · Phone, tablet or laptop</p>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <p>Learn Lingala — free and open source. Tokomonana! (See you soon!)</p>
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div>
+        <a href="/" class="brand brand-foot"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--brand)"/>
+          <path d="M8 10.5h16a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-8l-4.5 3.5V21.5H8A2.5 2.5 0 0 1 5.5 19v-6A2.5 2.5 0 0 1 8 10.5z" fill="var(--on-brand)"/>
+          <circle cx="24.5" cy="9" r="3.5" fill="var(--gold)"/></svg><span>Learn <b>Lingala</b></span></a>
+        <p class="muted"><span lang="ln">Tokomonana!</span> See you soon.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <div><h4>Learn</h4><a href="/app/" data-start>Open the app</a><a href="/app/#/account/login" data-signin>Sign in</a><a href="/app/#/translate">Translate</a></div>
+        <div><h4>Free guides</h4><a href="/alphabet">Alphabet &amp; sounds</a><a href="/sentences">Sentence structure</a></div>
+      </nav>
+    </div>
   </footer>
 
-  <script src="home.js"></script>
+  <div class="sticky-cta" id="sticky-cta">
+    <a href="/app/" class="btn btn-primary btn-block" data-start>Start learning free</a>
+  </div>
+
+  <script src="/landing.js" defer></script>
 </body>
 </html>
