@@ -3,7 +3,7 @@
 // matches first; this is the AI layer on top.
 
 import { HttpError } from './http.js';
-import { claudeJson, takeDailyQuota, BASE_LANGUAGE_NAMES } from './claude.js';
+import { claudeJson, takeDailyQuota, BASE_LANGUAGE_NAMES, TRANSLATE_MODEL } from './claude.js';
 import { cleanLang } from './chat.js';
 
 export const DAILY_TRANSLATE_CAP = 200;
@@ -69,6 +69,7 @@ export async function translate(env, user, body) {
 
   const quota = await takeDailyQuota(env.DB, 'translate_usage', user.id, DAILY_TRANSLATE_CAP, 'quota');
   const result = await claudeJson(env, {
+    model: TRANSLATE_MODEL,
     system: [
       { type: 'text', text: PROMPT },
       { type: 'text', text: `The user's base language is ${BASE_LANGUAGE_NAMES[lang]}.` },

@@ -33,7 +33,8 @@ A premium, app-like interface on every screen size:
 
 - **Phones:** sticky top bar with streak and XP, bottom tab bar (Learn, Review, Chat, Translate, Profile), full-screen lessons with a thumb-reachable answer bar.
 - **Desktop:** sidebar navigation, a centred content column, and a right panel with the daily-goal ring, streak week and the 5-level path.
-- Self-hosted **Inter** (variable weight and optical size, including ɛ, ɔ and tone marks), a warm neutral palette with Congo-green and gold accents, a custom SVG icon set, light and dark modes, and reduced-motion support.
+- Type: **Unbounded** for headlines, numbers and the wordmark, **Onest** for everything else. Both are self-hosted variable fonts, and both include ɛ, ɔ and correctly placed tone marks (few fonts do: check any replacement with the Lingala test phrase *Matɔ́ndɔ mingi*).
+- Colour: crisp cool neutrals, an emerald brand colour, an electric-lime accent on deep-green "stage" panels (landing hero, the app's Continue card, chat), gold for streaks. A custom SVG icon set, light and dark modes, and reduced-motion support.
 - **Onboarding:** pick your language, why you're learning, a daily goal, and whether to start from zero or test out of Level 1.
 
 ## Live chat practice
@@ -49,9 +50,9 @@ Each reply includes:
 
 The partner is pitched at your level. The Worker reads the phrases you've learned from D1 and tells the model to build on them, adding at most one or two new words per message.
 
-**How it works:** `POST /api/chat` ([`src/chat.js`](src/chat.js)) calls the Claude API (`claude-opus-5-5`, low effort for quick replies) with a JSON-schema output format, so every reply arrives in the same structure. Server-side refusal fallbacks are on (`fallbacks: "default"`). Scenarios live in [`public/app/js/chat-scenarios.js`](public/app/js/chat-scenarios.js).
+**How it works:** `POST /api/chat` ([`src/chat.js`](src/chat.js)) calls the Claude API (`claude-sonnet-5-5`, low effort for quick replies) with a JSON-schema output format, so every reply arrives in the same structure. Server-side refusal fallbacks are on (`fallbacks: "default"`). Scenarios live in [`public/app/js/chat-scenarios.js`](public/app/js/chat-scenarios.js).
 
-**Translation** (`POST /api/translate`, [`src/translate.js`](src/translate.js)) uses the same model and safeguards, capped at 200 translations per learner per day.
+**Translation** (`POST /api/translate`, [`src/translate.js`](src/translate.js)) uses `claude-opus-5-5` with the same safeguards, capped at 200 translations per learner per day.
 
 **Cost controls:** chat requires an account, is limited to 12 messages a minute per learner, and caps each learner at 150 messages a day (`DAILY_MESSAGE_CAP`). Failed calls don't count. Conversations are stored only on the learner's device and are cleared on sign-out.
 
@@ -97,7 +98,7 @@ public/            Static assets (Workers Static Assets, served from the edge ca
     js/i18n.js     Interface strings (English, French) and localized content helpers
     js/course-fr.js  French layer: meanings, notes, dialogues, levels, scenarios
     js/icons.js    SVG icon set
-    fonts/         Self-hosted Inter (SIL Open Font License)
+    fonts/         Self-hosted Onest + Unbounded (SIL Open Font License)
     sw.js          Service worker (offline support, installable PWA)
 src/worker.js      API Worker: auth, sessions, progress sync
 src/chat.js        Chat endpoint: prompt and conversation rules
