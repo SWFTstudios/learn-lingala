@@ -28,7 +28,9 @@
     // All API calls per IP.
     { "name": "API_LIMITER", "namespace_id": "4802", "simple": { "limit": 120, "period": 60 } },
     // Chat messages per signed-in user (each one is a Claude API call).
-    { "name": "CHAT_LIMITER", "namespace_id": "4803", "simple": { "limit": 12, "period": 60 } }
+    { "name": "CHAT_LIMITER", "namespace_id": "4803", "simple": { "limit": 12, "period": 60 } },
+    // AI translations per signed-in user.
+    { "name": "TRANSLATE_LIMITER", "namespace_id": "4804", "simple": { "limit": 20, "period": 60 } }
   ],
   "vars": {
     // Optional bot protection: create a Turnstile widget, put its site key here,

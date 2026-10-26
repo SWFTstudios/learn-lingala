@@ -1,8 +1,7 @@
-// App shell: hash routing and the non-lesson screens.
+// App shell: layout, routing, onboarding and the non-lesson screens.
 
 import { LEVELS, LEVEL_BY_ID, UNIT_BY_ID, COURSE, ITEMS } from './course.js';
 import { isLearned, isMastered, recall } from './srs.js';
-import { normalize } from './answer.js';
 import {
   buildLesson, buildDueReview, buildConversation, buildCheckpoint,
   currentUnit, unitProgress, levelProgress, dueItems, daysToLevel,
@@ -11,105 +10,190 @@ import { runSession } from './player.js';
 import { api } from './api.js';
 import * as store from './store.js';
 import { chatPickerHtml, mountChat, isScenario, clearChats } from './chat.js';
+import { translateHtml, wireTranslate, clearRecent } from './translate.js';
+import { t, tn, setLang, getLang, LANGS, gloss, unitText, levelText, dialogueText } from './i18n.js';
+import { icon } from './icons.js';
 
 const app = document.getElementById('app');
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const CONVERSATIONAL = 'conversations'; // the level that marks "conversational"
+const MOTIVATIONS = ['travel', 'family', 'music', 'friends', 'work', 'curious'];
+const GOALS = [10, 20, 30, 50];
 
-let config = { turnstileSiteKey: null, chatEnabled: null }; // null = still loading
+let config = { turnstileSiteKey: null, aiEnabled: null }; // null = still loading
 let stopSession = null;
 
-// --- Layout -------------------------------------------------------------------
+setLang(store.baseLang() || (navigator.language || '').slice(0, 2));
 
-function shell(active, content) {
-  const goal = store.dailyGoal();
-  const xp = store.todayXp();
-  const pct = Math.min(100, Math.round((xp / goal) * 100));
-  const s = store.streak();
-  const u = store.user();
-  const due = dueItems(store.getCard).length;
-  const tab = (key, href, icon, label, extra = '') =>
-    `<a href="${href}" class="${active === key ? 'active' : ''}"><span aria-hidden="true">${icon}</span>${label}${extra}</a>`;
+// --- Small building blocks -------------------------------------------------------
+
+const currentLevel = () => LEVEL_BY_ID.get(currentUnit(store.getCard).level);
+const levelNumber = (level) => LEVELS.indexOf(level) + 1;
+
+function ring(pct, size = 120, stroke = 10, inner = '') {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
   return `
-    <header class="topbar">
-      <a href="/" class="brand">Learn<span>Lingala</span></a>
-      <div class="topbar-stats">
-        <span class="chip ${s ? 'chip-fire' : ''}" title="Day streak">🔥 ${s}</span>
-        <span class="chip" title="Today's XP toward your daily goal">
-          <span class="ring" style="--p:${pct}"></span>${xp}/${goal} XP
-        </span>
-      </div>
-    </header>
-    <main class="screen">${content}</main>
-    <nav class="tabbar" aria-label="Main">
-      ${tab('learn', '#/', '📚', 'Learn')}
-      ${tab('review', '#/review', '🔁', 'Review', due ? `<b class="dot">${due}</b>` : '')}
-      ${tab('chat', '#/chat', '💬', 'Chat')}
-      ${tab('phrases', '#/phrases', '🗂️', 'Phrases')}
-      ${tab('account', '#/account', u ? '👤' : '☁️', u ? 'Account' : 'Save')}
-    </nav>`;
+    <div class="ring" style="width:${size}px;height:${size}px">
+      <svg viewBox="0 0 ${size} ${size}" aria-hidden="true">
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-track" stroke-width="${stroke}"/>
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-fill" stroke-width="${stroke}"
+          stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - Math.min(1, pct))}"/>
+      </svg>
+      <div class="ring-inner">${inner}</div>
+    </div>`;
+}
+
+function weekDots() {
+  const days = store.xpByDay();
+  return [...Array(7)]
+    .map((_, k) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - k));
+      const xp = days[store.today(d)] || 0;
+      const met = xp >= store.dailyGoal();
+      return `<span class="wday ${xp ? 'on' : ''} ${met ? 'met' : ''} ${k === 6 ? 'today' : ''}">
+        <i>${xp ? icon(met ? 'check' : 'flame') : ''}</i><small>${d.toLocaleDateString(getLang(), { weekday: 'narrow' })}</small></span>`;
+    })
+    .join('');
 }
 
 function weeksText(days) {
-  if (days <= 0) return 'now';
-  if (days < 14) return `in about ${days} day${days === 1 ? '' : 's'}`;
+  if (days <= 0) return t('pace.now');
+  if (days < 14) return tn('pace.days', days);
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return `in about ${Math.round(days / 7)} weeks — around ${d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`;
+  return t('pace.weeks', { n: Math.round(days / 7), date: d.toLocaleDateString(getLang(), { month: 'long', year: 'numeric' }) });
 }
 
-const currentLevel = () => LEVEL_BY_ID.get(currentUnit(store.getCard).level);
-
-// --- Screens ------------------------------------------------------------------
-
-function unitRow(un, isCurrent) {
-  const p = unitProgress(un, store.getCard);
-  const mastered = un.items.filter((i) => isMastered(store.getCard(i.id))).length;
+// Daily goal, streak and path: the right rail on desktop, a strip on mobile.
+function goalCard() {
+  const goal = store.dailyGoal();
+  const xp = store.todayXp();
+  const done = xp >= goal;
   return `
-    <a href="#/unit/${un.id}" class="unit-row ${p.done ? 'done' : ''} ${isCurrent ? 'current' : ''}">
-      <span class="unit-emoji" aria-hidden="true">${un.emoji}</span>
-      <span class="unit-text">
-        <span class="unit-title">${esc(un.title)} ${isCurrent ? '<span class="badge">Up next</span>' : ''}</span>
-        <span class="unit-sub" lang="ln">${esc(un.lg)}${un.dialogue ? ' · 💬' : ''}</span>
-        <span class="meter"><span style="width:${(p.learned / p.total) * 100}%"></span></span>
-      </span>
-      <span class="unit-count">${p.done ? (mastered === p.total ? '⭐' : '✓') : `${p.learned}/${p.total}`}</span>
-    </a>`;
+    <section class="panel goal-panel">
+      ${ring(xp / goal, 92, 9, `<b>${xp}</b><small>/ ${goal} XP</small>`)}
+      <div>
+        <p class="panel-kicker">${t('rail.today')}</p>
+        <p class="panel-title">${done ? t('rail.goalDone') : t('rail.goalLeft', { n: goal - xp })}</p>
+        <a href="#/account" class="panel-link">${t('rail.changeGoal')}</a>
+      </div>
+    </section>`;
+}
+
+function streakCard() {
+  const s = store.streak();
+  return `
+    <section class="panel streak-panel">
+      <div class="streak-head">
+        <span class="streak-flame ${s ? 'lit' : ''}">${icon('flame')}</span>
+        <div><p class="panel-title">${tn('rail.streak', s)}</p><p class="muted small">${s ? t('rail.keepItUp') : t('rail.startStreak')}</p></div>
+      </div>
+      <div class="week">${weekDots()}</div>
+    </section>`;
 }
 
 function pathCard() {
   const level = currentLevel();
-  const idx = LEVELS.indexOf(level);
   const conversational = LEVELS.slice(0, LEVELS.findIndex((l) => l.id === CONVERSATIONAL) + 1).every(
     (l) => levelProgress(l.id, store.getCard).done,
   );
   const days = daysToLevel(CONVERSATIONAL, store.getCard, store.dailyGoal());
   return `
-    <section class="card path">
-      <div class="path-head">
-        <span class="path-kicker">Your path to conversational</span>
-        <a href="#/level/${level.id}" class="path-link">Level ${idx + 1} of ${LEVELS.length} →</a>
+    <section class="panel path-panel">
+      <div class="panel-row">
+        <p class="panel-kicker">${t('path.title')}</p>
+        <a href="#/level/${level.id}" class="panel-link">${t('path.levelOf', { n: levelNumber(level), total: LEVELS.length })}</a>
       </div>
-      <div class="path-steps">
+      <ol class="path">
         ${LEVELS.map((l, i) => {
           const p = levelProgress(l.id, store.getCard);
           const state = p.done ? 'done' : l === level ? 'now' : '';
-          return `<a href="#/level/${l.id}" class="path-step ${state}" title="${esc(l.title)}">
-            <span class="path-dot">${p.done ? '✓' : i + 1}</span>
-            <span class="path-name">${esc(l.title)}</span>
-            <span class="path-bar"><span style="width:${(p.learned / p.total) * 100}%"></span></span>
-          </a>`;
+          return `<li class="path-step ${state}"><a href="#/level/${l.id}">
+            <span class="path-dot">${p.done ? icon('check') : i + 1}</span>
+            <span class="path-name">${esc(levelText(l).title)}</span>
+            <span class="path-bar"><span style="width:${(p.learned / p.total) * 100}%"></span></span></a></li>`;
         }).join('')}
-      </div>
+      </ol>
       <p class="path-eta">${
         conversational
-          ? "🎉 You've reached conversational level. Now sound like a local with <strong>Mwana mboka</strong>."
-          : `At your ${store.dailyGoal()} XP/day goal, you'll finish <strong>Level 4 · Conversations</strong> ${weeksText(days)}.
-             <a href="#/account">Change goal</a>`
+          ? t('path.reached')
+          : t('path.eta', { goal: store.dailyGoal(), level: esc(levelText(LEVEL_BY_ID.get(CONVERSATIONAL)).title), when: weeksText(days) })
       }</p>
     </section>`;
+}
+
+const rail = () => `<aside class="rail">${goalCard()}${streakCard()}${pathCard()}</aside>`;
+
+// --- Layout ---------------------------------------------------------------------
+
+const NAV = [
+  ['learn', '#/', 'learn'],
+  ['review', '#/review', 'review'],
+  ['chat', '#/chat', 'chat'],
+  ['translate', '#/translate', 'translate'],
+  ['account', '#/account', 'user'],
+];
+
+function shell(active, content, { withRail = false } = {}) {
+  const due = dueItems(store.getCard).length;
+  const s = store.streak();
+  const xp = store.todayXp();
+  const u = store.user();
+  const navLink = ([key, href, ic], cls) =>
+    `<a href="${href}" class="${cls} ${active === key ? 'active' : ''}" ${active === key ? 'aria-current="page"' : ''}>
+      ${icon(ic)}<span>${key === 'account' && !u ? t('nav.save') : t(`nav.${key}`)}</span>
+      ${key === 'review' && due ? `<b class="dot">${due}</b>` : ''}</a>`;
+
+  return `
+    <div class="layout ${withRail ? 'has-rail' : ''}">
+      <aside class="sidebar">
+        <a href="#/" class="brand">${brandMark()}<span>Learn<b>Lingala</b></span></a>
+        <nav class="side-nav" aria-label="${t('nav.main')}">${NAV.map((n) => navLink(n, 'side-link')).join('')}</nav>
+        <div class="side-foot">
+          <div class="side-stats">
+            <span class="stat-pill ${s ? 'fire' : ''}">${icon('flame')} ${s}</span>
+            <span class="stat-pill">${icon('bolt')} ${xp} XP</span>
+          </div>
+          ${u ? `<a href="#/account" class="side-user"><span class="avatar">${esc((u.displayName || u.email)[0].toUpperCase())}</span><span>${esc(u.displayName || u.email)}</span></a>` : ''}
+        </div>
+      </aside>
+      <header class="topbar">
+        <a href="#/" class="brand">${brandMark()}<span>Learn<b>Lingala</b></span></a>
+        <div class="topbar-stats">
+          <span class="stat-pill ${s ? 'fire' : ''}" title="${t('rail.streakTitle')}">${icon('flame')} ${s}</span>
+          <span class="stat-pill" title="${t('rail.today')}">${icon('bolt')} ${xp}</span>
+        </div>
+      </header>
+      <main class="screen" id="main">${content}</main>
+      ${withRail ? rail() : ''}
+      <nav class="tabbar" aria-label="${t('nav.main')}">${NAV.map((n) => navLink(n, 'tab')).join('')}</nav>
+    </div>`;
+}
+
+const brandMark = () =>
+  `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--brand)"/>
+   <path d="M8 10.5h16a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-8l-4.5 3.5V21.5H8A2.5 2.5 0 0 1 5.5 19v-6A2.5 2.5 0 0 1 8 10.5z" fill="var(--on-brand)"/>
+   <circle cx="24.5" cy="9" r="3.5" fill="var(--gold)"/></svg>`;
+
+// --- Home -----------------------------------------------------------------------
+
+function unitRow(un, isCurrent) {
+  const p = unitProgress(un, store.getCard);
+  const mastered = un.items.filter((i) => isMastered(store.getCard(i.id))).length;
+  const text = unitText(un);
+  return `
+    <a href="#/unit/${un.id}" class="unit-row ${p.done ? 'done' : ''} ${isCurrent ? 'current' : ''}">
+      ${ring(p.learned / p.total, 52, 5, `<span class="unit-emoji">${un.emoji}</span>`)}
+      <span class="unit-text">
+        <span class="unit-title">${esc(text.title)} ${isCurrent ? `<span class="badge badge-next">${t('home.upNext')}</span>` : ''}</span>
+        <span class="unit-sub"><span lang="ln">${esc(un.lg)}</span>${un.dialogue ? ` · ${icon('chat')}` : ''}</span>
+      </span>
+      <span class="unit-count">${p.done ? (mastered === p.total ? icon('trophy') : icon('check')) : `${p.learned}/${p.total}`}</span>
+    </a>`;
 }
 
 function homeScreen() {
@@ -118,25 +202,26 @@ function homeScreen() {
   const level = currentLevel();
   const due = dueItems(store.getCard).length;
   const learned = ITEMS.filter((i) => isLearned(store.getCard(i.id))).length;
-  const goal = store.dailyGoal();
-  const xp = store.todayXp();
   const u = store.user();
-  const greeting = u?.displayName ? `Mbote, ${esc(u.displayName)}!` : 'Mbote!';
+  const why = store.motivation();
+  const name = u?.displayName ? `, ${esc(u.displayName)}` : '';
 
   const levels = LEVELS.map((l, i) => {
     const p = levelProgress(l.id, store.getCard);
+    const text = levelText(l);
     return `
       <details class="level" ${l === level ? 'open' : ''}>
         <summary>
-          <span class="level-num ${p.done ? 'done' : ''}">${p.done ? '✓' : i + 1}</span>
+          <span class="level-num ${p.done ? 'done' : ''}">${p.done ? icon('check') : i + 1}</span>
           <span class="level-text">
-            <span class="level-title">${esc(l.title)}</span>
-            <span class="level-sub">${esc(l.subtitle)} · ${esc(l.cefr)}</span>
+            <span class="level-title">${esc(text.title)}</span>
+            <span class="level-sub">${esc(text.subtitle)} · ${esc(l.cefr)}</span>
           </span>
-          <span class="unit-count">${p.learned}/${p.total}</span>
+          <span class="level-count">${p.learned}/${p.total}</span>
+          <span class="chev">${icon('forward')}</span>
         </summary>
         <div class="units">${l.units.map((id) => unitRow(UNIT_BY_ID.get(id), UNIT_BY_ID.get(id) === unit && !prog.done)).join('')}</div>
-        <a href="#/level/${l.id}" class="level-more">Goals & checkpoint for this level →</a>
+        <a href="#/level/${l.id}" class="level-more">${t('home.levelMore')} ${icon('forward')}</a>
       </details>`;
   }).join('');
 
@@ -144,281 +229,269 @@ function homeScreen() {
     'learn',
     `
     <section class="hello">
-      <h1>${greeting}</h1>
-      <p class="muted">${
-        xp >= goal
-          ? 'Daily goal done — malamu mingi! Extra practice now makes tomorrow easier.'
-          : `${goal - xp} XP to today's goal. A lesson takes about 3 minutes.`
-      }</p>
+      <p class="eyebrow">${why ? t(`mot.line.${why}`) : t('home.eyebrow')}</p>
+      <h1><span lang="ln">Mbote</span>${name}!</h1>
     </section>
 
-    <a href="#/lesson/${unit.id}" class="hero-card">
-      <span class="hero-emoji" aria-hidden="true">${unit.emoji}</span>
-      <span class="hero-text">
-        <span class="hero-kicker">${prog.done ? 'Practice' : learned ? 'Continue' : 'Start here'} · Level ${LEVELS.indexOf(level) + 1}</span>
-        <span class="hero-title">${esc(unit.title)}</span>
-        <span class="hero-sub">${prog.learned}/${prog.total} learned</span>
+    <div class="mobile-only today-strip">
+      ${ring(store.todayXp() / store.dailyGoal(), 54, 6, `<small>${store.todayXp()}</small>`)}
+      <div><b>${store.todayXp() >= store.dailyGoal() ? t('rail.goalDone') : t('rail.goalLeft', { n: store.dailyGoal() - store.todayXp() })}</b>
+        <span>${tn('rail.streak', store.streak())}</span></div>
+    </div>
+
+    <a href="#/lesson/${unit.id}" class="hero">
+      <span class="hero-art" aria-hidden="true">${unit.emoji}</span>
+      <span class="hero-body">
+        <span class="hero-kicker">${prog.done ? t('home.practice') : learned ? t('home.continue') : t('home.start')} · ${t('home.level', { n: levelNumber(level) })}</span>
+        <span class="hero-title">${esc(unitText(unit).title)}</span>
+        <span class="hero-meter"><span style="width:${(prog.learned / prog.total) * 100}%"></span></span>
+        <span class="hero-sub">${t('home.learnedOf', { n: prog.learned, total: prog.total })} · ${t('home.minutes')}</span>
       </span>
-      <span class="hero-go" aria-hidden="true">→</span>
+      <span class="hero-cta">${icon('play')}</span>
     </a>
 
     ${
       due
-        ? `<a href="#/session/review" class="review-card">
-            <strong>🔁 ${due} ${due === 1 ? 'phrase is' : 'phrases are'} ready to review</strong>
-            <span>Reviewing at the right moment locks them into long-term memory.</span>
-          </a>`
+        ? `<a href="#/session/review" class="callout callout-review">${icon('review')}
+            <span><strong>${tn('home.due', due)}</strong><small>${t('home.dueSub')}</small></span>${icon('forward')}</a>`
         : ''
     }
 
-    ${pathCard()}
+    <div class="quick-grid">
+      <a href="#/chat" class="quick quick-chat">${icon('chat')}<strong>${t('home.chatTitle')}</strong><small>${t('home.chatSub')}</small></a>
+      <a href="#/translate" class="quick quick-tr">${icon('translate')}<strong>${t('home.trTitle')}</strong><small>${t('home.trSub')}</small></a>
+    </div>
 
-    <a href="#/chat" class="chat-card">
-      <span class="chat-card-emoji" aria-hidden="true">💬</span>
-      <span><strong>Practise a real conversation</strong>
-      <span class="muted small">Text with Mama Nzeba, a market seller, a taxi driver… in Lingala, live.</span></span>
-    </a>
-
-    <section class="stats-row">
-      <div class="stat"><b>${learned}</b><span>phrases learned</span></div>
-      <div class="stat"><b>${ITEMS.filter((i) => isMastered(store.getCard(i.id))).length}</b><span>mastered</span></div>
-      <div class="stat"><b>${store.totalXp()}</b><span>total XP</span></div>
-    </section>
+    <div class="mobile-only">${pathCard()}</div>
 
     ${
       !u && learned
-        ? `<a href="#/account" class="save-banner">☁️ <span><strong>Save your progress.</strong> Create a free account to keep your streak and sync across devices.</span></a>`
+        ? `<a href="#/account" class="callout callout-save">${icon('lock')}<span><strong>${t('home.saveTitle')}</strong><small>${t('home.saveSub')}</small></span>${icon('forward')}</a>`
         : ''
     }
 
-    <h2 class="section-title">Course</h2>
+    <h2 class="section-title">${t('home.course')}</h2>
     <div class="levels">${levels}</div>
 
-    <p class="footnote">Reference guides: <a href="/alphabet.html">The alphabet</a> · <a href="/sentences.html">Sentence structure</a></p>`,
+    <div class="stats-row">
+      <div class="stat"><b>${learned}</b><span>${t('stat.learned')}</span></div>
+      <div class="stat"><b>${ITEMS.filter((i) => isMastered(store.getCard(i.id))).length}</b><span>${t('stat.mastered')}</span></div>
+      <div class="stat"><b>${store.totalXp()}</b><span>${t('stat.xp')}</span></div>
+    </div>`,
+    { withRail: true },
   );
 }
+
+// --- Level & unit ------------------------------------------------------------------
 
 function levelScreen(id) {
   const level = LEVEL_BY_ID.get(id);
   if (!level) return homeScreen();
-  const idx = LEVELS.indexOf(level);
+  const text = levelText(level);
   const p = levelProgress(id, store.getCard);
   const next = level.units.map((u) => UNIT_BY_ID.get(u)).find((u) => !unitProgress(u, store.getCard).done);
   return shell(
     'learn',
     `
-    <a href="#/" class="back">← Course</a>
-    <p class="kicker">Level ${idx + 1} · ${esc(level.cefr)} · ${esc(level.weeks)}</p>
-    <h1>${esc(level.title)}</h1>
-    <p class="muted">${esc(level.subtitle)} · ${p.learned}/${p.total} phrases learned</p>
-    <div class="meter meter-lg"><span style="width:${(p.learned / p.total) * 100}%"></span></div>
+    <a href="#/" class="back">${icon('back')} ${t('common.course')}</a>
+    <header class="page-head level-head">
+      <p class="eyebrow">${t('home.level', { n: levelNumber(level) })} · ${esc(level.cefr)} · ${esc(text.weeks)}</p>
+      <h1>${esc(text.title)}</h1>
+      <p class="lede">${esc(text.subtitle)} · ${t('home.learnedOf', { n: p.learned, total: p.total })}</p>
+      <div class="meter meter-lg"><span style="width:${(p.learned / p.total) * 100}%"></span></div>
+    </header>
 
-    <h2 class="section-title">By the end of this level you can…</h2>
-    <ul class="can-do card">${level.canDo.map((c) => `<li class="${p.done ? 'done' : ''}">${esc(c)}</li>`).join('')}</ul>
+    <section class="card">
+      <h2 class="card-title">${t('level.canDo')}</h2>
+      <ul class="can-do">${text.canDo.map((c) => `<li class="${p.done ? 'done' : ''}">${icon(p.done ? 'check' : 'target')}<span>${esc(c)}</span></li>`).join('')}</ul>
+    </section>
 
-    ${next ? `<a href="#/lesson/${next.id}" class="btn btn-primary btn-block">${p.learned ? 'Continue' : 'Start'}: ${esc(next.title)}</a>` : ''}
+    ${next ? `<a href="#/lesson/${next.id}" class="btn btn-primary btn-block">${icon('play')} ${p.learned ? t('common.continue') : t('common.start')}: ${esc(unitText(next).title)}</a>` : ''}
 
-    <div class="card checkpoint-card">
-      <strong>🎯 Level checkpoint</strong>
-      <p class="muted small">${
-        p.done
-          ? 'Prove it: a mixed test of this level with no hints. Score 80% to earn the level badge.'
-          : 'Already know some of this? Score 80% on a mixed test to skip ahead — everything in this level is added to your reviews.'
-      }</p>
-      <a href="#/checkpoint/${level.id}" class="btn btn-secondary btn-block">${p.done ? 'Take the checkpoint' : 'Test out of this level'}</a>
-    </div>
+    <section class="card checkpoint-card">
+      <div class="checkpoint-icon">${icon('trophy')}</div>
+      <div>
+        <h2 class="card-title">${t('level.checkpoint')}</h2>
+        <p class="muted">${p.done ? t('level.checkpointDone') : t('level.checkpointSkip')}</p>
+        <a href="#/checkpoint/${level.id}" class="btn btn-secondary">${p.done ? t('level.takeCheckpoint') : t('level.testOut')}</a>
+      </div>
+    </section>
 
-    <h2 class="section-title">Units</h2>
+    <h2 class="section-title">${t('level.units')}</h2>
     <div class="units">${level.units.map((u) => unitRow(UNIT_BY_ID.get(u), UNIT_BY_ID.get(u) === next)).join('')}</div>`,
   );
 }
 
 function strengthLabel(card) {
-  if (!isLearned(card)) return ['new', 'New'];
-  if (isMastered(card)) return ['mastered', 'Mastered'];
+  if (!isLearned(card)) return ['new', t('str.new')];
+  if (isMastered(card)) return ['mastered', t('str.mastered')];
   const r = recall(card);
-  if (r < 0.6) return ['weak', 'Needs review'];
-  if (r < 0.85) return ['ok', 'Learning'];
-  return ['strong', 'Strong'];
+  if (r < 0.6) return ['weak', t('str.weak')];
+  if (r < 0.85) return ['ok', t('str.ok')];
+  return ['strong', t('str.strong')];
 }
 
-function wordRow(i, { strength = true } = {}) {
+function wordRow(i) {
   const [cls, label] = strengthLabel(store.getCard(i.id));
   return `<li class="word">
-    <span class="word-lg" lang="ln">${esc(i.lg)} ${i.local ? '<span class="badge badge-local">local</span>' : ''}</span>
-    <span class="word-en">${esc(i.en)}</span>
-    ${strength ? `<span class="strength strength-${cls}">${label}</span>` : ''}
+    <span class="word-main"><span class="word-lg" lang="ln">${esc(i.lg)}</span>
+    <span class="word-en">${esc(gloss(i))}</span></span>
+    ${i.local ? `<span class="badge badge-local">${t('badge.local')}</span>` : ''}
+    <span class="strength strength-${cls}">${label}</span>
   </li>`;
-}
-
-function chat(lines) {
-  return `<div class="chat">${lines
-    .map(
-      (l) => `<button type="button" class="bubble bubble-${l.who}">
-        <span class="bubble-who">${l.who === 'you' ? 'You' : 'Them'}</span>
-        <span class="bubble-lg" lang="ln">${esc(l.lg)}</span>
-        <span class="bubble-en">${esc(l.en)}</span></button>`,
-    )
-    .join('')}</div>`;
 }
 
 function unitScreen(id) {
   const unit = UNIT_BY_ID.get(id);
   if (!unit) return homeScreen();
   const level = LEVEL_BY_ID.get(unit.level);
+  const text = unitText(unit);
   const p = unitProgress(unit, store.getCard);
+  const d = unit.dialogue && dialogueText(unit);
   return shell(
     'learn',
     `
-    <a href="#/level/${level.id}" class="back">← Level ${LEVELS.indexOf(level) + 1} · ${esc(level.title)}</a>
-    <h1 class="unit-h1"><span aria-hidden="true">${unit.emoji}</span> ${esc(unit.title)}</h1>
-    <p class="muted"><span lang="ln">${esc(unit.lg)}</span> · ${p.learned}/${p.total} learned</p>
-    <a href="#/lesson/${unit.id}" class="btn btn-primary btn-block">${p.done ? 'Practice this unit' : p.learned ? 'Continue lesson' : 'Start lesson'}</a>
-    <h2 class="section-title">How it works</h2>
-    <div class="notes card">${unit.intro}</div>
+    <a href="#/level/${level.id}" class="back">${icon('back')} ${t('home.level', { n: levelNumber(level) })} · ${esc(levelText(level).title)}</a>
+    <header class="page-head unit-head">
+      <span class="unit-hero-emoji" aria-hidden="true">${unit.emoji}</span>
+      <div>
+        <h1>${esc(text.title)}</h1>
+        <p class="lede"><span lang="ln">${esc(unit.lg)}</span> · ${t('home.learnedOf', { n: p.learned, total: p.total })}</p>
+      </div>
+    </header>
+    <a href="#/lesson/${unit.id}" class="btn btn-primary btn-block">${icon('play')} ${p.done ? t('unit.practice') : p.learned ? t('unit.continue') : t('unit.start')}</a>
+    <h2 class="section-title">${t('unit.how')}</h2>
+    <div class="notes card">${text.intro}</div>
     ${
-      unit.dialogue
-        ? `<h2 class="section-title">💬 Conversation: ${esc(unit.dialogue.title)}</h2>
-           <p class="muted small">${esc(unit.dialogue.setting)} Tap a line for the English.</p>
-           ${chat(unit.dialogue.lines)}
-           <a href="#/talk/${unit.id}" class="btn btn-secondary btn-block">🎭 Role-play this conversation</a>`
+      d
+        ? `<h2 class="section-title">${t('unit.conversation', { title: esc(d.title) })}</h2>
+           <p class="muted small">${esc(d.setting)} ${t('unit.tapLine')}</p>
+           <div class="chat">${unit.dialogue.lines
+             .map(
+               (l, i) => `<button type="button" class="bubble bubble-${l.who}">
+                 <span class="bubble-who">${l.who === 'you' ? t('who.you') : t('who.them')}</span>
+                 <span class="bubble-lg" lang="ln">${esc(l.lg)}</span>
+                 <span class="bubble-en">${esc(d.lines[i])}</span></button>`,
+             )
+             .join('')}</div>
+           <a href="#/talk/${unit.id}" class="btn btn-secondary btn-block">${icon('chat')} ${t('unit.roleplay')}</a>`
         : ''
     }
-    <h2 class="section-title">Phrases</h2>
-    <ul class="word-list">${unit.items.map((i) => wordRow(i)).join('')}</ul>`,
+    <h2 class="section-title">${t('unit.phrases')}</h2>
+    <ul class="word-list">${unit.items.map(wordRow).join('')}</ul>`,
   );
 }
+
+// --- Review -----------------------------------------------------------------------
 
 function reviewScreen() {
   const due = dueItems(store.getCard);
   const cards = ITEMS.map((i) => store.getCard(i.id)).filter(isLearned);
   const buckets = { weak: 0, ok: 0, strong: 0, mastered: 0 };
   for (const c of cards) buckets[strengthLabel(c)[0]]++;
-  const days = store.xpByDay();
-  const week = [...Array(7)].map((_, k) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - k));
-    const xp = days[store.today(d)] || 0;
-    const h = Math.min(100, Math.round((xp / store.dailyGoal()) * 100));
-    return `<div class="day"><span class="day-bar"><span style="height:${h}%"></span></span>
-      <span class="day-label">${d.toLocaleDateString(undefined, { weekday: 'narrow' })}</span></div>`;
-  });
   const talkable = COURSE.filter((u) => u.dialogue && unitProgress(u, store.getCard).learned > 0);
 
   return shell(
     'review',
     `
-    <h1>Review</h1>
+    <header class="page-head">
+      <p class="eyebrow">${icon('review')} ${t('review.eyebrow')}</p>
+      <h1>${t('review.title')}</h1>
+      <p class="lede">${t('review.sub')}</p>
+    </header>
     ${
       cards.length === 0
-        ? `<div class="card empty"><p>Nothing to review yet. Finish your first lesson and your phrases will show up here, scheduled right before you'd forget them.</p>
-           <a href="#/" class="btn btn-primary">Start learning</a></div>`
-        : `<div class="card">
-            <p class="big-number">${due.length}</p>
-            <p class="muted">${due.length ? `phrase${due.length === 1 ? '' : 's'} due now` : 'Nothing due — you’re all caught up!'}</p>
-            <a href="#/session/review" class="btn btn-primary btn-block">${due.length ? 'Start review' : 'Practice weakest phrases'}</a>
-          </div>
-          <h2 class="section-title">Memory strength</h2>
+        ? `<section class="card empty">${icon('review', 'empty-icon')}<p>${t('review.empty')}</p>
+           <a href="#/" class="btn btn-primary">${t('review.startLearning')}</a></section>`
+        : `<section class="card review-hero">
+            ${ring(cards.length ? 1 - due.length / cards.length : 1, 116, 10, `<b>${due.length}</b><small>${t('review.due')}</small>`)}
+            <div>
+              <p class="panel-title">${due.length ? tn('review.dueNow', due.length) : t('review.caughtUp')}</p>
+              <p class="muted">${due.length ? t('review.dueSub') : t('review.caughtUpSub')}</p>
+              <a href="#/session/review" class="btn btn-primary">${icon('play')} ${due.length ? t('review.start') : t('review.practiceWeak')}</a>
+            </div>
+          </section>
+          <h2 class="section-title">${t('review.strength')}</h2>
           <div class="strength-grid">
-            <div class="sg sg-weak"><b>${buckets.weak}</b>Needs review</div>
-            <div class="sg sg-ok"><b>${buckets.ok}</b>Learning</div>
-            <div class="sg sg-strong"><b>${buckets.strong}</b>Strong</div>
-            <div class="sg sg-mastered"><b>${buckets.mastered}</b>Mastered</div>
+            <div class="sg sg-weak"><b>${buckets.weak}</b>${t('str.weak')}</div>
+            <div class="sg sg-ok"><b>${buckets.ok}</b>${t('str.ok')}</div>
+            <div class="sg sg-strong"><b>${buckets.strong}</b>${t('str.strong')}</div>
+            <div class="sg sg-mastered"><b>${buckets.mastered}</b>${t('str.mastered')}</div>
           </div>`
     }
     ${
       talkable.length
-        ? `<h2 class="section-title">🎭 Practise conversations</h2>
+        ? `<h2 class="section-title">${t('review.conversations')}</h2>
            <div class="units">${talkable
-             .map((u) => `<a href="#/talk/${u.id}" class="unit-row"><span class="unit-emoji">${u.emoji}</span>
-               <span class="unit-text"><span class="unit-title">${esc(u.dialogue.title)}</span>
-               <span class="unit-sub">${esc(u.title)}</span></span><span class="unit-count">→</span></a>`)
+             .map((u) => `<a href="#/talk/${u.id}" class="unit-row"><span class="unit-emoji solo">${u.emoji}</span>
+               <span class="unit-text"><span class="unit-title">${esc(dialogueText(u).title)}</span>
+               <span class="unit-sub">${esc(unitText(u).title)}</span></span><span class="unit-count">${icon('forward')}</span></a>`)
              .join('')}</div>`
         : ''
     }
-    <h2 class="section-title">Last 7 days</h2>
-    <div class="card week">${week.join('')}</div>
-    <p class="footnote">How this works: each phrase is scheduled with spaced repetition. Get it right and the gap before
-    the next review grows (1 day → 3 → a week → a month…). Miss it and it comes back sooner.</p>`,
+    <p class="footnote">${t('review.how')}</p>`,
+    { withRail: true },
   );
 }
 
-let phraseQuery = '';
-let phraseFilter = 'all';
+// --- Chat & translate -----------------------------------------------------------------
 
-function phraseList() {
-  const q = normalize(phraseQuery);
-  const groups = COURSE.map((u) => {
-    const rows = u.items.filter(
-      (i) =>
-        (phraseFilter !== 'local' || i.local) &&
-        (phraseFilter !== 'learned' || isLearned(store.getCard(i.id))) &&
-        (!q || normalize(i.lg).includes(q) || normalize(i.en).includes(q)),
-    );
-    return rows.length
-      ? `<h3 class="phrase-group">${u.emoji} ${esc(u.title)}</h3><ul class="word-list">${rows.map((i) => wordRow(i, { strength: false })).join('')}</ul>`
-      : '';
-  }).join('');
-  return groups || '<p class="muted">No phrases match.</p>';
-}
+const chatScreen = () =>
+  shell('chat', chatPickerHtml({ aiEnabled: config.aiEnabled, signedIn: !!store.user(), currentLevelId: currentLevel().id }));
 
-function phrasesScreen() {
-  return shell(
-    'phrases',
-    `
-    <h1>Phrasebook</h1>
-    <p class="muted">Every phrase in the course — search in English or Lingala.</p>
-    <input type="search" id="phrase-search" class="search" placeholder="Search: hungry, taxi, mbote…" value="${esc(phraseQuery)}" aria-label="Search phrases">
-    <div class="filters" role="group" aria-label="Filter">
-      ${[['all', 'All'], ['local', '🇨🇩 Sounds local'], ['learned', 'Learned']]
-        .map(([k, label]) => `<button type="button" class="filter ${phraseFilter === k ? 'active' : ''}" data-filter="${k}">${label}</button>`)
-        .join('')}
-    </div>
-    <div id="phrase-list">${phraseList()}</div>`,
-  );
-}
+const translateScreen = () => shell('translate', translateHtml({ aiEnabled: config.aiEnabled }));
 
-function chatScreen() {
-  return shell(
-    'chat',
-    chatPickerHtml({ chatEnabled: config.chatEnabled, signedIn: !!store.user(), currentLevelId: currentLevel().id }),
-  );
+// --- Account ------------------------------------------------------------------------
+
+function settingsHtml() {
+  const goal = store.dailyGoal();
+  return `
+    <section class="card settings">
+      <h2 class="card-title">${icon('globe')} ${t('acct.language')}</h2>
+      <div class="seg lang-seg" role="radiogroup" aria-label="${t('acct.language')}">
+        ${Object.entries(LANGS)
+          .map(([id, l]) => `<button type="button" role="radio" aria-checked="${id === getLang()}" class="${id === getLang() ? 'active' : ''}" data-lang="${id}">${l.native}</button>`)
+          .join('')}
+      </div>
+      <h2 class="card-title">${icon('target')} ${t('acct.goal')}</h2>
+      <div class="goal-picker" role="radiogroup" aria-label="${t('acct.goal')}">
+        ${GOALS.map(
+          (g) => `<button type="button" role="radio" aria-checked="${g === goal}" class="goal ${g === goal ? 'selected' : ''}" data-goal="${g}">
+            <b>${g} XP</b><span>${t(`goal.name.${g}`)} · ${t(`goal.${g}`)}</span></button>`,
+        ).join('')}
+      </div>
+      <p class="muted small">${t('acct.pace', { level: esc(levelText(LEVEL_BY_ID.get(CONVERSATIONAL)).title), when: weeksText(daysToLevel(CONVERSATIONAL, store.getCard, goal)) })}</p>
+    </section>`;
 }
 
 function accountScreen(mode = 'signup') {
   const u = store.user();
-  const goal = store.dailyGoal();
-  const goalPicker = `
-    <h2 class="section-title">Daily goal</h2>
-    <div class="goal-picker" role="radiogroup" aria-label="Daily goal">
-      ${[10, 20, 30, 50]
-        .map(
-          (g) => `<button type="button" role="radio" aria-checked="${g === goal}" class="goal ${g === goal ? 'selected' : ''}" data-goal="${g}">
-            <b>${g} XP</b><span>${{ 10: 'Casual · ~5 min', 20: 'Regular · ~10 min', 30: 'Serious · ~15 min', 50: 'Intense · ~25 min' }[g]}</span></button>`,
-        )
-        .join('')}
-    </div>
-    <p class="muted small">At this pace you'll finish Level 4 · Conversations ${weeksText(daysToLevel(CONVERSATIONAL, store.getCard, goal))}.</p>`;
-
   if (u) {
     return shell(
       'account',
       `
-      <h1>Account</h1>
-      <div class="card">
-        <p><strong>${esc(u.displayName || 'Learner')}</strong></p>
-        <p class="muted">${esc(u.email)}</p>
-        <p class="muted small" id="sync-status">${store.hasUnsynced() ? 'Changes waiting to sync…' : 'All progress synced ✓'}</p>
+      <header class="profile">
+        <span class="avatar avatar-lg">${esc((u.displayName || u.email)[0].toUpperCase())}</span>
+        <div>
+          <h1>${esc(u.displayName || t('acct.learner'))}</h1>
+          <p class="muted">${esc(u.email)}</p>
+          <p class="sync" id="sync-status">${store.hasUnsynced() ? t('acct.syncing') : `${icon('check')} ${t('acct.synced')}`}</p>
+        </div>
+      </header>
+      <div class="stats-row">
+        <div class="stat"><b>${store.streak()}</b><span>${t('stat.streak')}</span></div>
+        <div class="stat"><b>${ITEMS.filter((i) => isLearned(store.getCard(i.id))).length}</b><span>${t('stat.learned')}</span></div>
+        <div class="stat"><b>${store.totalXp()}</b><span>${t('stat.xp')}</span></div>
       </div>
-      ${goalPicker}
-      <button type="button" class="btn btn-secondary btn-block" id="signout">Sign out</button>
+      ${settingsHtml()}
+      <button type="button" class="btn btn-secondary btn-block" id="signout">${icon('logout')} ${t('acct.signout')}</button>
       <details class="danger-zone">
-        <summary>Delete account</summary>
+        <summary>${t('acct.delete')}</summary>
         <form id="delete-form" class="form">
-          <p class="muted small">This permanently deletes your account and all progress.</p>
-          <label>Confirm with your password<input type="password" name="password" required autocomplete="current-password"></label>
+          <p class="muted small">${t('acct.deleteWarn')}</p>
+          <label>${t('acct.confirmPassword')}<input type="password" name="password" required autocomplete="current-password"></label>
           <p class="form-error" role="alert"></p>
-          <button class="btn btn-danger btn-block">Delete my account</button>
+          <button class="btn btn-danger btn-block">${t('acct.deleteBtn')}</button>
         </form>
       </details>`,
     );
@@ -428,31 +501,147 @@ function accountScreen(mode = 'signup') {
   return shell(
     'account',
     `
-    <h1>${signup ? 'Save your progress' : 'Welcome back'}</h1>
-    <p class="muted">${
-      signup
-        ? 'Your progress is saved on this device. Create a free account to keep your streak safe and learn on any device.'
-        : 'Sign in to sync your progress.'
-    }</p>
+    <header class="page-head">
+      <p class="eyebrow">${icon('lock')} ${t('acct.eyebrow')}</p>
+      <h1>${signup ? t('acct.saveTitle') : t('acct.welcomeBack')}</h1>
+      <p class="lede">${signup ? t('acct.saveSub') : t('acct.signinSub')}</p>
+    </header>
     <div class="seg" role="tablist">
-      <a href="#/account/signup" role="tab" aria-selected="${signup}" class="${signup ? 'active' : ''}">Create account</a>
-      <a href="#/account/login" role="tab" aria-selected="${!signup}" class="${signup ? '' : 'active'}">Sign in</a>
+      <a href="#/account/signup" role="tab" aria-selected="${signup}" class="${signup ? 'active' : ''}">${t('acct.create')}</a>
+      <a href="#/account/login" role="tab" aria-selected="${!signup}" class="${signup ? '' : 'active'}">${t('acct.signin')}</a>
     </div>
     <form id="auth-form" class="form card" data-mode="${mode}" novalidate>
-      ${signup ? '<label>Your name <span class="muted">(optional)</span><input name="displayName" autocomplete="given-name" maxlength="50"></label>' : ''}
-      <label>Email<input type="email" name="email" required autocomplete="email" inputmode="email"></label>
-      <label>Password<input type="password" name="password" required minlength="${signup ? 8 : 1}"
+      ${signup ? `<label>${t('acct.name')} <span class="muted">${t('acct.optional')}</span><input name="displayName" autocomplete="given-name" maxlength="50"></label>` : ''}
+      <label>${t('acct.email')}<input type="email" name="email" required autocomplete="email" inputmode="email"></label>
+      <label>${t('acct.password')}<input type="password" name="password" required minlength="${signup ? 8 : 1}"
         autocomplete="${signup ? 'new-password' : 'current-password'}">
-        ${signup ? '<span class="muted small">At least 8 characters.</span>' : ''}</label>
+        ${signup ? `<span class="muted small">${t('acct.passwordHint')}</span>` : ''}</label>
       <div id="turnstile"></div>
       <p class="form-error" role="alert"></p>
-      <button class="btn btn-primary btn-block">${signup ? 'Create account' : 'Sign in'}</button>
+      <button class="btn btn-primary btn-block">${signup ? t('acct.create') : t('acct.signin')}</button>
     </form>
-    ${goalPicker}`,
+    ${settingsHtml()}`,
   );
 }
 
-// --- Screen behaviour ---------------------------------------------------------
+// --- Onboarding -------------------------------------------------------------------
+
+const ob = { step: 0, motivation: null, goal: 20 };
+
+function onboardingScreen() {
+  const steps = ['welcome', 'lang', 'why', 'goal', 'level'];
+  const step = steps[ob.step];
+  const progress = `<div class="ob-progress"><span style="width:${(ob.step / (steps.length - 1)) * 100}%"></span></div>`;
+  const back = ob.step > 0 ? `<button type="button" class="icon-btn ob-back" aria-label="${t('common.back')}">${icon('back')}</button>` : '';
+
+  const bodies = {
+    welcome: `
+      <div class="ob-hero">
+        <div class="ob-mark">${brandMark()}</div>
+        <p class="eyebrow">Mbote!</p>
+        <h1>${t('ob.welcomeTitle')}</h1>
+        <p class="lede">${t('ob.welcomeSub')}</p>
+        <ul class="ob-points">
+          <li>${icon('target')} ${t('ob.point1')}</li>
+          <li>${icon('chat')} ${t('ob.point2')}</li>
+          <li>${icon('flame')} ${t('ob.point3')}</li>
+        </ul>
+      </div>
+      <div class="ob-actions">
+        <button type="button" class="btn btn-primary btn-block" data-next>${t('ob.getStarted')}</button>
+        <a href="#/account/login" class="btn btn-ghost btn-block" data-skip>${t('ob.haveAccount')}</a>
+      </div>`,
+    lang: `
+      <h1>${t('ob.langTitle')}</h1>
+      <p class="lede">${t('ob.langSub')}</p>
+      <div class="ob-options">
+        ${Object.entries(LANGS)
+          .map(([id, l]) => `<button type="button" class="ob-option ${id === getLang() ? 'selected' : ''}" data-lang="${id}">
+            <span class="ob-flag">${l.badge}</span><span><b>${l.native}</b><small>${l.hint}</small></span></button>`)
+          .join('')}
+      </div>
+      <p class="muted small">${t('ob.moreLangs')}</p>`,
+    why: `
+      <h1>${t('ob.whyTitle')}</h1>
+      <p class="lede">${t('ob.whySub')}</p>
+      <div class="ob-options grid-2">
+        ${MOTIVATIONS.map(
+          (m) => `<button type="button" class="ob-option ${ob.motivation === m ? 'selected' : ''}" data-why="${m}">
+            <span class="ob-flag">${t(`mot.icon.${m}`)}</span><span><b>${t(`mot.${m}`)}</b></span></button>`,
+        ).join('')}
+      </div>`,
+    goal: `
+      <h1>${t('ob.goalTitle')}</h1>
+      <p class="lede">${t('ob.goalSub')}</p>
+      <div class="ob-options">
+        ${GOALS.map(
+          (g) => `<button type="button" class="ob-option ${ob.goal === g ? 'selected' : ''}" data-goal="${g}">
+            <span class="ob-flag">${g}</span><span><b>${t(`goal.name.${g}`)}</b><small>${t(`goal.${g}`)}</small></span></button>`,
+        ).join('')}
+      </div>
+      <p class="muted small">${t('ob.goalPace', { when: weeksText(daysToLevel(CONVERSATIONAL, store.getCard, ob.goal)) })}</p>`,
+    level: `
+      <h1>${t('ob.levelTitle')}</h1>
+      <p class="lede">${t('ob.levelSub')}</p>
+      <div class="ob-options">
+        <button type="button" class="ob-option" data-start="new"><span class="ob-flag">${icon('learn')}</span>
+          <span><b>${t('ob.new')}</b><small>${t('ob.newSub')}</small></span></button>
+        <button type="button" class="ob-option" data-start="some"><span class="ob-flag">${icon('trophy')}</span>
+          <span><b>${t('ob.some')}</b><small>${t('ob.someSub')}</small></span></button>
+      </div>`,
+  };
+
+  const nextDisabled = (step === 'why' && !ob.motivation) || step === 'level';
+  return `
+    <div class="onboard">
+      <div class="ob-top">${back}${ob.step > 0 ? progress : ''}</div>
+      <div class="ob-body ob-${step}">${bodies[step]}</div>
+      ${
+        step === 'welcome' || step === 'level'
+          ? ''
+          : `<div class="ob-foot"><button type="button" class="btn btn-primary btn-block" data-next ${nextDisabled ? 'disabled' : ''}>${t('btn.continue')}</button></div>`
+      }
+    </div>`;
+}
+
+function wireOnboarding() {
+  const go = (delta) => {
+    ob.step += delta;
+    render();
+  };
+  app.querySelector('.ob-back')?.addEventListener('click', () => go(-1));
+  app.querySelectorAll('[data-next]').forEach((b) => b.addEventListener('click', () => go(1)));
+  app.querySelectorAll('[data-lang]').forEach((b) =>
+    b.addEventListener('click', () => {
+      setLang(b.dataset.lang);
+      store.setBaseLang(b.dataset.lang).catch(() => {});
+      render();
+    }),
+  );
+  app.querySelectorAll('[data-why]').forEach((b) =>
+    b.addEventListener('click', () => {
+      ob.motivation = b.dataset.why;
+      render();
+    }),
+  );
+  app.querySelectorAll('[data-goal]').forEach((b) =>
+    b.addEventListener('click', () => {
+      ob.goal = Number(b.dataset.goal);
+      render();
+    }),
+  );
+  app.querySelectorAll('[data-start]').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (!store.baseLang()) store.setBaseLang(getLang()).catch(() => {});
+      store.finishOnboarding({ motivation: ob.motivation, goal: ob.goal });
+      location.hash = b.dataset.start === 'new' ? `#/lesson/${COURSE[0].id}` : `#/checkpoint/${LEVELS[0].id}`;
+    }),
+  );
+}
+
+const needsOnboarding = () => !store.onboarded() && !store.user() && store.allCards().length === 0;
+
+// --- Screen behaviour -----------------------------------------------------------------
 
 let turnstileWidget = null;
 
@@ -469,7 +658,24 @@ function loadTurnstile() {
   document.head.appendChild(s);
 }
 
+function wireSettings() {
+  document.querySelectorAll('.lang-seg [data-lang]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      setLang(b.dataset.lang);
+      await store.setBaseLang(b.dataset.lang).catch((err) => alert(err.message));
+      render();
+    }),
+  );
+  document.querySelectorAll('.goal').forEach((b) =>
+    b.addEventListener('click', async () => {
+      await store.setGoal(Number(b.dataset.goal)).catch((err) => alert(err.message));
+      render();
+    }),
+  );
+}
+
 function wireAccount() {
+  wireSettings();
   const authForm = document.getElementById('auth-form');
   if (authForm) {
     loadTurnstile();
@@ -478,6 +684,8 @@ function wireAccount() {
       const errEl = authForm.querySelector('.form-error');
       const btn = authForm.querySelector('button');
       const data = Object.fromEntries(new FormData(authForm));
+      data.baseLang = getLang();
+      data.dailyGoal = store.dailyGoal();
       if (window.turnstile && turnstileWidget != null) data.turnstileToken = window.turnstile.getResponse(turnstileWidget);
       errEl.textContent = '';
       btn.disabled = true;
@@ -485,6 +693,7 @@ function wireAccount() {
         const path = authForm.dataset.mode === 'signup' ? 'auth/signup' : 'auth/login';
         const { user } = await api(path, { method: 'POST', body: data });
         await store.signedIn(user).catch(() => {});
+        setLang(store.baseLang());
         location.hash = '#/';
       } catch (err) {
         errEl.textContent = err.message;
@@ -495,48 +704,27 @@ function wireAccount() {
     });
   }
 
-  document.querySelectorAll('.goal').forEach((b) =>
-    b.addEventListener('click', async () => {
-      await store.setGoal(Number(b.dataset.goal)).catch((err) => alert(err.message));
-      render();
-    }),
-  );
-
   document.getElementById('signout')?.addEventListener('click', async () => {
-    if (store.hasUnsynced() && !navigator.onLine && !confirm("You're offline and some progress hasn't synced. Sign out anyway?")) return;
+    if (store.hasUnsynced() && !navigator.onLine && !confirm(t('acct.offlineSignout'))) return;
     await store.signOut();
-    clearChats(); // conversations are private to the signed-in learner
+    clearChats(); // conversations and recent translations are private to the learner
+    clearRecent();
     location.hash = '#/';
   });
 
   const del = document.getElementById('delete-form');
   del?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!confirm('Delete your account and all progress permanently?')) return;
+    if (!confirm(t('acct.deleteConfirm'))) return;
     try {
       await store.deleteAccount(new FormData(del).get('password'));
       clearChats();
+      clearRecent();
       location.hash = '#/';
     } catch (err) {
       del.querySelector('.form-error').textContent = err.message;
     }
   });
-}
-
-function wirePhrases() {
-  const input = document.getElementById('phrase-search');
-  const list = document.getElementById('phrase-list');
-  input.addEventListener('input', () => {
-    phraseQuery = input.value;
-    list.innerHTML = phraseList();
-  });
-  document.querySelectorAll('.filter').forEach((b) =>
-    b.addEventListener('click', () => {
-      phraseFilter = b.dataset.filter;
-      document.querySelectorAll('.filter').forEach((x) => x.classList.toggle('active', x === b));
-      list.innerHTML = phraseList();
-    }),
-  );
 }
 
 function wireBubbles() {
@@ -567,49 +755,44 @@ function endSession() {
 function summaryHeadline(s) {
   if (s.checkpoint) {
     return s.checkpoint.passed
-      ? ['🏅', `Level ${LEVELS.indexOf(s.checkpoint.level) + 1} passed!`]
-      : ['💪', 'Not quite yet'];
+      ? ['trophy', t('sum.levelPassed', { n: levelNumber(s.checkpoint.level) })]
+      : ['target', t('sum.notYet')];
   }
-  if (s.kind === 'conversation') return ['🎭', 'Conversation complete!'];
-  return s.perfect ? ['🏆', 'Perfect lesson!'] : ['🎉', 'Lesson complete!'];
+  if (s.kind === 'conversation') return ['chat', t('sum.conversationDone')];
+  return s.perfect ? ['trophy', t('sum.perfect')] : ['check', t('sum.done')];
 }
 
 function summaryText(s) {
   if (s.checkpoint) {
     const { passed, level, testedOut } = s.checkpoint;
-    if (!passed) return `You need 80% to pass <strong>${esc(level.title)}</strong>. Keep doing lessons and reviews — then try again.`;
-    return testedOut
-      ? `You tested out of <strong>${esc(level.title)}</strong>. ${testedOut} phrases were added to your reviews to lock them in.`
-      : `You've proven you can handle <strong>${esc(level.title)}</strong>. Malamu mingi!`;
+    const title = esc(levelText(level).title);
+    if (!passed) return t('sum.failCheckpoint', { level: title });
+    return testedOut ? t('sum.testedOut', { level: title, n: testedOut }) : t('sum.proved', { level: title });
   }
-  if (s.kind === 'conversation') return 'Role-playing real conversations is the fastest way to make phrases come out automatically.';
-  return s.learned
-    ? `You learned <strong>${s.learned}</strong> new ${s.learned === 1 ? 'phrase' : 'phrases'}${s.reviewed ? ` and reviewed ${s.reviewed}` : ''}. They'll come back right before you'd forget them.`
-    : `You reviewed <strong>${s.reviewed}</strong> ${s.reviewed === 1 ? 'phrase' : 'phrases'}. They'll come back right before you'd forget them.`;
+  if (s.kind === 'conversation') return t('sum.conversationSub');
+  const learned = s.learned ? tn('sum.learned', s.learned) : '';
+  const reviewed = s.reviewed ? tn('sum.reviewed', s.reviewed) : '';
+  return `${[learned, reviewed].filter(Boolean).join(' · ')}. ${t('sum.comeBack')}`;
 }
 
 function showSummary(s) {
   const goal = store.dailyGoal();
   const xp = store.todayXp();
   const goalJustHit = xp >= goal && xp - s.xp < goal;
-  const [emoji, title] = summaryHeadline(s);
+  const [ic, title] = summaryHeadline(s);
   app.innerHTML = `
     <div class="summary">
-      <div class="summary-emoji" aria-hidden="true">${emoji}</div>
+      <div class="summary-badge ${s.checkpoint && !s.checkpoint.passed ? 'muted' : ''}">${icon(ic)}</div>
       <h1>${title}</h1>
-      ${goalJustHit ? `<p class="goal-hit">Daily goal reached · 🔥 ${store.streak()} day streak</p>` : ''}
+      ${goalJustHit ? `<p class="goal-hit">${icon('flame')} ${t('sum.goalHit', { n: store.streak() })}</p>` : ''}
       <div class="summary-stats">
         <div class="stat"><b>+${s.xp}</b><span>XP</span></div>
-        <div class="stat"><b>${s.accuracy}%</b><span>accuracy</span></div>
-        <div class="stat"><b>${Math.floor(s.seconds / 60)}:${String(s.seconds % 60).padStart(2, '0')}</b><span>time</span></div>
+        <div class="stat"><b>${s.accuracy}%</b><span>${t('sum.accuracy')}</span></div>
+        <div class="stat"><b>${Math.floor(s.seconds / 60)}:${String(s.seconds % 60).padStart(2, '0')}</b><span>${t('sum.time')}</span></div>
       </div>
       <p class="muted">${summaryText(s)}</p>
-      ${
-        !store.user()
-          ? `<a href="#/account" class="save-banner">☁️ <span><strong>Don't lose this.</strong> Create a free account to save your progress.</span></a>`
-          : ''
-      }
-      <button type="button" class="btn btn-primary btn-block" id="summary-continue">Continue</button>
+      ${!store.user() ? `<a href="#/account" class="callout callout-save">${icon('lock')}<span><strong>${t('sum.saveTitle')}</strong><small>${t('home.saveSub')}</small></span>${icon('forward')}</a>` : ''}
+      <button type="button" class="btn btn-primary btn-block" id="summary-continue">${t('btn.continue')}</button>
     </div>`;
   document.getElementById('summary-continue').addEventListener('click', goHome);
 }
@@ -620,7 +803,7 @@ function goHome() {
   render();
 }
 
-// --- Router -------------------------------------------------------------------
+// --- Router -----------------------------------------------------------------------
 
 function render() {
   if (stopSession) return; // don't redraw underneath a running session
@@ -636,7 +819,7 @@ function render() {
     location.hash = '#/review';
     return;
   }
-  if (route === 'chat' && isScenario(arg) && config.chatEnabled && store.user()) {
+  if (route === 'chat' && isScenario(arg) && config.aiEnabled && store.user()) {
     document.body.classList.add('in-session');
     stopSession = mountChat(app, arg, {
       onExit: () => {
@@ -647,19 +830,26 @@ function render() {
     });
     return;
   }
+  if (needsOnboarding() && route !== 'account') {
+    document.body.classList.add('in-session');
+    app.innerHTML = onboardingScreen();
+    wireOnboarding();
+    return;
+  }
 
   app.innerHTML =
     route === 'unit' ? unitScreen(arg)
     : route === 'level' ? levelScreen(arg)
     : route === 'review' ? reviewScreen()
-    : route === 'phrases' ? phrasesScreen()
     : route === 'chat' ? chatScreen()
+    : route === 'translate' || route === 'phrases' ? translateScreen()
     : route === 'account' ? accountScreen(arg === 'login' ? 'login' : 'signup')
     : homeScreen();
 
   if (route === 'account') wireAccount();
-  if (route === 'phrases') wirePhrases();
+  if (route === 'translate' || route === 'phrases') wireTranslate(app, { rerender: render });
   if (route === 'unit') wireBubbles();
+  document.title = `${t(`title.${route || 'learn'}`)} · Learn Lingala`;
   window.scrollTo(0, 0);
 }
 
@@ -669,7 +859,7 @@ window.addEventListener('hashchange', () => {
 });
 store.subscribe(() => {
   const status = document.getElementById('sync-status');
-  if (status) status.textContent = store.hasUnsynced() ? 'Changes waiting to sync…' : 'All progress synced ✓';
+  if (status) status.innerHTML = store.hasUnsynced() ? t('acct.syncing') : `${icon('check')} ${t('acct.synced')}`;
 });
 
 // Sync when the app is backgrounded or comes back online.
@@ -680,15 +870,17 @@ window.addEventListener('online', () => store.sync().catch(() => {}));
 
 render();
 store.refreshUser().then(() => {
-  if (!stopSession && !document.querySelector('.summary')) render();
+  if (store.baseLang() && store.baseLang() !== getLang()) setLang(store.baseLang());
+  if (!stopSession && !document.querySelector('.summary, .onboard')) render();
 });
 api('config')
   .then((c) => {
-    config = c;
-    if (location.hash.startsWith('#/chat') && !stopSession) render(); // chat availability is now known
+    config = { ...c, aiEnabled: c.aiEnabled ?? c.chatEnabled };
+    const route = location.hash.split('/')[1];
+    if ((route === 'chat' || route === 'translate') && !stopSession) render(); // AI availability is now known
   })
   .catch(() => {
-    config = { ...config, chatEnabled: false };
+    config = { ...config, aiEnabled: false };
   });
 
 if ('serviceWorker' in navigator) {

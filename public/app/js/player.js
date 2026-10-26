@@ -6,6 +6,8 @@ import { checkTyped, normalize } from './answer.js';
 import { choices, replyChoices, tiles, acceptedAnswers, shuffle, CHECKPOINT_PASS } from './lesson.js';
 import { schedule, newCard, isLearned } from './srs.js';
 import { getCard, putCards, addXp } from './store.js';
+import { t, gloss, itemNote, itemTip, unitText, dialogueText, drillText } from './i18n.js';
+import { icon } from './icons.js';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -16,17 +18,17 @@ let audio;
 function tone(freqs) {
   try {
     audio ??= new AudioContext();
-    let t = audio.currentTime;
+    let time = audio.currentTime;
     for (const f of freqs) {
       const osc = audio.createOscillator();
       const gain = audio.createGain();
       osc.frequency.value = f;
-      gain.gain.setValueAtTime(0.08, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+      gain.gain.setValueAtTime(0.08, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
       osc.connect(gain).connect(audio.destination);
-      osc.start(t);
-      osc.stop(t + 0.16);
-      t += 0.09;
+      osc.start(time);
+      osc.stop(time + 0.16);
+      time += 0.09;
     }
   } catch {
     // Audio unavailable; feedback is still visual.
@@ -40,12 +42,18 @@ const soundWrong = () => {
 
 // --- Shared bits --------------------------------------------------------------
 
+// A dialogue line with its translation in the learner's language.
+const lineWithGloss = (unitId, index) => {
+  const line = UNIT_BY_ID.get(unitId).dialogue.lines[index];
+  return { ...line, gloss: dialogueText(UNIT_BY_ID.get(unitId)).lines[index] };
+};
+
 function bubble(line, { reveal = false } = {}) {
   return `
     <button type="button" class="bubble bubble-${line.who} ${reveal ? 'revealed' : ''}">
-      <span class="bubble-who">${line.who === 'you' ? 'You' : 'Them'}</span>
+      <span class="bubble-who">${line.who === 'you' ? t('who.you') : t('who.them')}</span>
       <span class="bubble-lg" lang="ln">${esc(line.lg)}</span>
-      <span class="bubble-en">${esc(line.en)}</span>
+      <span class="bubble-en">${esc(line.gloss)}</span>
     </button>`;
 }
 
@@ -53,9 +61,11 @@ function wireBubbles(el) {
   el.querySelectorAll('.bubble').forEach((b) => b.addEventListener('click', () => b.classList.toggle('revealed')));
 }
 
+const label = (text, extra = '') => `<div class="ex-label">${extra}${text}</div>`;
+
 function choiceList(options, render) {
   return `<div class="options">${options
-    .map((o, i) => `<button type="button" class="option" data-key="${i}"><span class="key">${i + 1}</span>${render(o)}</button>`)
+    .map((o, i) => `<button type="button" class="option" data-key="${i}"><span class="key">${i + 1}</span><span class="option-text">${render(o)}</span></button>`)
     .join('')}</div>`;
 }
 
@@ -96,11 +106,11 @@ function typedExercise({ header, accepted, answer, sub }) {
   return {
     html: `${header}
       <input class="type-input" lang="ln" autocomplete="off" autocapitalize="off" autocorrect="off"
-             spellcheck="false" enterkeyhint="done" placeholder="Type in Lingala" aria-label="Your answer">
+             spellcheck="false" enterkeyhint="done" placeholder="${t('ex.placeholder')}" aria-label="${t('ex.placeholder')}">
       <div class="special-keys">
         <button type="button" class="key-btn" data-ch="ɛ">ɛ</button>
         <button type="button" class="key-btn" data-ch="ɔ">ɔ</button>
-        <span class="hint">Accents optional — plain e and o work too.</span>
+        <span class="hint">${t('ex.accentHint')}</span>
       </div>`,
     mount(el, setReady) {
       const input = el.querySelector('.type-input');
@@ -132,95 +142,99 @@ function typedExercise({ header, accepted, answer, sub }) {
 // Say it out loud, reveal, then grade yourself honestly.
 function speakExercise({ header, answer, sub, extra = '' }) {
   return {
-    selfGraded: true,
     html: `${header}
-      <div class="speak-cue" aria-hidden="true">🗣️</div>
-      <p class="speak-instr">Say it <strong>out loud</strong> before you check.</p>
+      <div class="speak-cue">${icon('speak')}</div>
+      <p class="speak-instr">${t('ex.sayAloud')}</p>
       <div class="speak-answer" hidden>
         <div class="speak-lg" lang="ln">${esc(answer)}</div>
         ${extra}
       </div>`,
-    actionLabel: 'Show answer',
+    actionLabel: t('ex.showAnswer'),
     mount(el, setReady) {
       setReady(true);
     },
     check(el, ask) {
       el.querySelector('.speak-answer').hidden = false;
-      el.querySelector('.speak-instr').textContent = 'Did you say it like this?';
+      el.querySelector('.speak-instr').textContent = t('ex.likeThis');
       return ask().then((ok) => ({ ok, answer, sub, selfGraded: true }));
     },
   };
 }
 
+const tipHtml = (tip) => (tip ? `<div class="local-tip"><strong>${t('ex.localTip')}</strong> ${tip}</div>` : '');
+
 // --- Exercises ----------------------------------------------------------------
 
 function notesStep(step) {
   const unit = UNIT_BY_ID.get(step.unitId);
+  const text = unitText(unit);
   return {
     auto: true,
     html: `
-      <div class="ex-label">New unit · ${esc(unit.title)}</div>
-      <h2 class="ex-title">${unit.emoji} <span lang="ln">${esc(unit.lg)}</span></h2>
-      <div class="notes">${unit.intro}</div>`,
+      ${label(t('ex.newUnit', { title: esc(text.title) }))}
+      <h2 class="ex-title"><span class="ex-title-emoji">${unit.emoji}</span> <span lang="ln">${esc(unit.lg)}</span></h2>
+      <div class="notes">${text.intro}</div>`,
   };
 }
 
 function dialogueStep(step) {
-  const d = UNIT_BY_ID.get(step.unitId).dialogue;
+  const unit = UNIT_BY_ID.get(step.unitId);
+  const d = dialogueText(unit);
   return {
     auto: true,
     html: `
-      <div class="ex-label">Conversation · ${esc(d.title)}</div>
+      ${label(t('ex.conversation', { title: esc(d.title) }))}
       <p class="setting">${esc(d.setting)}</p>
-      <p class="hint">Read it out loud. Tap a line to see the English — try to guess first.</p>
-      <div class="chat">${d.lines.map((l) => bubble(l)).join('')}</div>`,
+      <p class="hint">${t('ex.readAloud')}</p>
+      <div class="chat">${unit.dialogue.lines.map((_, i) => bubble(lineWithGloss(step.unitId, i))).join('')}</div>`,
     mount: wireBubbles,
   };
 }
 
 function introStep(item) {
+  const note = itemNote(item);
   return {
     auto: true,
     html: `
-      <div class="ex-label"><span class="badge">New</span> ${item.local ? '<span class="badge badge-local">Sounds local</span>' : ''} Learn this</div>
+      ${label(t('ex.learnThis'), `<span class="badge">${t('ex.new')}</span>${item.local ? `<span class="badge badge-local">${t('badge.local')}</span>` : ''}`)}
       <div class="intro-card">
         <div class="intro-lg" lang="ln">${esc(item.lg)}</div>
-        <div class="intro-en">${esc(item.en)}</div>
-        ${item.note ? `<div class="intro-note">${item.note}</div>` : ''}
+        <div class="intro-en">${esc(gloss(item))}</div>
+        ${note ? `<div class="intro-note">${note}</div>` : ''}
       </div>
-      ${item.tip ? `<div class="local-tip"><strong>🇨🇩 Local tip</strong> ${item.tip}</div>` : ''}`,
+      ${tipHtml(itemTip(item))}`,
   };
 }
 
 function mcStep(item, reverse) {
-  const field = reverse ? 'lg' : 'en';
   return choiceExercise({
     html: `
-      <div class="ex-label">${reverse ? 'How do you say this in Lingala?' : 'What does this mean?'}</div>
-      <div class="prompt ${reverse ? '' : 'prompt-lg'}" ${reverse ? '' : 'lang="ln"'}>${esc(reverse ? item.en : item.lg)}</div>`,
-    options: choices(item, field),
-    render: (o) => (reverse ? `<span lang="ln">${esc(o.lg)}</span>` : esc(o.en)),
+      ${label(reverse ? t('ex.howSay') : t('ex.whatMeans'))}
+      <div class="prompt ${reverse ? '' : 'prompt-lg'}" ${reverse ? '' : 'lang="ln"'}>${esc(reverse ? gloss(item) : item.lg)}</div>`,
+    options: choices(item, reverse ? 'lg' : gloss),
+    render: (o) => (reverse ? `<span lang="ln">${esc(o.lg)}</span>` : esc(gloss(o))),
     isRight: (o) => o.id === item.id,
-    answer: reverse ? item.lg : item.en,
-    sub: `${item.en} = ${item.lg}`,
+    answer: reverse ? item.lg : gloss(item),
+    sub: `${gloss(item)} = ${item.lg}`,
   });
 }
 
 function replyStep(step) {
-  const lines = UNIT_BY_ID.get(step.unitId).dialogue.lines;
-  const answer = lines[step.line];
-  const context = lines.slice(Math.max(0, step.line - 2), step.line);
+  const unit = UNIT_BY_ID.get(step.unitId);
+  const answer = lineWithGloss(step.unitId, step.line);
+  const context = [];
+  for (let i = Math.max(0, step.line - 2); i < step.line; i++) context.push(lineWithGloss(step.unitId, i));
   return choiceExercise({
     html: `
-      <div class="ex-label">Your turn — what do you say?</div>
-      <p class="setting">${esc(UNIT_BY_ID.get(step.unitId).dialogue.setting)}</p>
-      <div class="chat">${context.map((l) => bubble(l)).join('') || '<p class="hint">You start the conversation.</p>'}</div>
-      <p class="hint">Hint: ${esc(answer.en)}</p>`,
+      ${label(t('ex.yourTurn'))}
+      <p class="setting">${esc(dialogueText(unit).setting)}</p>
+      <div class="chat">${context.map((l) => bubble(l)).join('') || `<p class="hint">${t('ex.youStart')}</p>`}</div>
+      <p class="hint">${t('ex.hint', { text: esc(answer.gloss) })}</p>`,
     options: replyChoices(step.unitId, step.line),
     render: (o) => `<span lang="ln">${esc(o.lg)}</span>`,
     isRight: (o) => normalize(o.lg) === normalize(answer.lg),
     answer: answer.lg,
-    sub: answer.en,
+    sub: answer.gloss,
   });
 }
 
@@ -229,21 +243,21 @@ function tilesStep(item) {
   const chosen = [];
   return {
     html: `
-      <div class="ex-label">Build this in Lingala</div>
-      <div class="prompt">${esc(item.en)}</div>
-      <div class="tile-answer" aria-label="Your answer"></div>
+      ${label(t('ex.build'))}
+      <div class="prompt">${esc(gloss(item))}</div>
+      <div class="tile-answer" aria-label="${t('ex.yourAnswer')}"></div>
       <div class="tile-bank"></div>`,
     mount(el, setReady) {
       const answerEl = el.querySelector('.tile-answer');
       const bankEl = el.querySelector('.tile-bank');
       const draw = () => {
         answerEl.innerHTML = chosen
-          .map((t) => `<button type="button" class="tile" lang="ln" data-key="${t.key}">${esc(t.word)}</button>`)
+          .map((tl) => `<button type="button" class="tile" lang="ln" data-key="${tl.key}">${esc(tl.word)}</button>`)
           .join('');
         bankEl.innerHTML = bank
-          .map((t) => {
-            const used = chosen.includes(t);
-            return `<button type="button" class="tile ${used ? 'used' : ''}" lang="ln" data-key="${t.key}" ${used ? 'disabled' : ''}>${esc(t.word)}</button>`;
+          .map((tl) => {
+            const used = chosen.includes(tl);
+            return `<button type="button" class="tile ${used ? 'used' : ''}" lang="ln" data-key="${tl.key}" ${used ? 'disabled' : ''}>${esc(tl.word)}</button>`;
           })
           .join('');
         setReady(chosen.length > 0);
@@ -251,69 +265,68 @@ function tilesStep(item) {
       answerEl.addEventListener('click', (e) => {
         const key = e.target.closest('.tile')?.dataset.key;
         if (key == null) return;
-        chosen.splice(chosen.findIndex((t) => String(t.key) === key), 1);
+        chosen.splice(chosen.findIndex((tl) => String(tl.key) === key), 1);
         draw();
       });
       bankEl.addEventListener('click', (e) => {
         const key = e.target.closest('.tile:not(.used)')?.dataset.key;
         if (key == null) return;
-        chosen.push(bank.find((t) => String(t.key) === key));
+        chosen.push(bank.find((tl) => String(tl.key) === key));
         draw();
       });
       draw();
     },
     check(el) {
       el.querySelectorAll('.tile').forEach((b) => (b.disabled = true));
-      const got = normalize(chosen.map((t) => t.word).join(' '));
-      return { ok: acceptedAnswers(item).some((a) => normalize(a) === got), answer: item.lg, sub: item.en };
+      const got = normalize(chosen.map((tl) => tl.word).join(' '));
+      return { ok: acceptedAnswers(item).some((a) => normalize(a) === got), answer: item.lg, sub: gloss(item) };
     },
   };
 }
 
 function typeStep(item) {
   return typedExercise({
-    header: `<div class="ex-label">Type this in Lingala</div><div class="prompt">${esc(item.en)}</div>`,
+    header: `${label(t('ex.type'))}<div class="prompt">${esc(gloss(item))}</div>`,
     accepted: acceptedAnswers(item),
     answer: item.lg,
-    sub: item.en,
+    sub: gloss(item),
   });
 }
 
 function transformStep(item) {
-  const d = item.drill;
+  const d = drillText(item);
   return typedExercise({
     header: `
-      <div class="ex-label">Pattern drill — change the sentence</div>
+      ${label(t('ex.drill'))}
       <div class="drill">
-        <div class="drill-from"><span lang="ln">${esc(d.from)}</span><small>${esc(d.fromEn)}</small></div>
+        <div class="drill-from"><span lang="ln">${esc(item.drill.from)}</span><small>${esc(d.fromEn)}</small></div>
         <div class="drill-cue">→ ${esc(d.cue)}</div>
       </div>`,
     accepted: acceptedAnswers(item),
     answer: item.lg,
-    sub: item.en,
+    sub: gloss(item),
   });
 }
 
 function speakStep(item) {
   return speakExercise({
-    header: `<div class="ex-label">Speak</div><div class="prompt">${esc(item.en)}</div>`,
+    header: `${label(t('ex.speak'))}<div class="prompt">${esc(gloss(item))}</div>`,
     answer: item.lg,
-    sub: item.en,
-    extra: item.tip ? `<div class="local-tip"><strong>🇨🇩</strong> ${item.tip}</div>` : '',
+    sub: gloss(item),
+    extra: tipHtml(itemTip(item)),
   });
 }
 
 function speakLineStep(step) {
-  const d = UNIT_BY_ID.get(step.unitId).dialogue;
-  const line = d.lines[step.line];
-  const prev = d.lines[step.line - 1];
+  const line = lineWithGloss(step.unitId, step.line);
+  const prev = step.line > 0 ? lineWithGloss(step.unitId, step.line - 1) : null;
   return speakExercise({
     header: `
-      <div class="ex-label">Role-play — say your line</div>
+      ${label(t('ex.roleplay'))}
       <div class="chat">${prev ? bubble(prev, { reveal: true }) : ''}</div>
-      <div class="prompt">${esc(line.en)}</div>`,
+      <div class="prompt">${esc(line.gloss)}</div>`,
     answer: line.lg,
-    sub: line.en,
+    sub: line.gloss,
   });
 }
 
@@ -324,10 +337,10 @@ function matchStep(step, onMistake) {
   return {
     auto: 'when-done',
     html: `
-      <div class="ex-label">Warm-up: tap the matching pairs</div>
+      ${label(t('ex.warmup'))}
       <div class="match">
         <div class="match-col">${left.map((i) => `<button type="button" class="tile match-tile" lang="ln" data-side="l" data-id="${i.id}">${esc(i.lg)}</button>`).join('')}</div>
-        <div class="match-col">${right.map((i) => `<button type="button" class="tile match-tile" data-side="r" data-id="${i.id}">${esc(i.en)}</button>`).join('')}</div>
+        <div class="match-col">${right.map((i) => `<button type="button" class="tile match-tile" data-side="r" data-id="${i.id}">${esc(gloss(i))}</button>`).join('')}</div>
       </div>`,
     mount(el, setReady) {
       let sel = null;
@@ -386,6 +399,8 @@ function exerciseFor(step, onMatchMistake) {
 // Results are tracked per card; dialogue lines without a card get their own key.
 const resultKey = (step) => step.itemId || `line:${step.unitId}:${step.line}`;
 
+const PRAISE = ['Malamu!', 'Kitoko!', 'Malamu mingi!', 'Ya solo!', 'Ebongi!'];
+
 // --- Session runner -----------------------------------------------------------
 
 export function runSession(root, session, { onExit, onFinish }) {
@@ -402,14 +417,16 @@ export function runSession(root, session, { onExit, onFinish }) {
   root.innerHTML = `
     <div class="session">
       <header class="session-top">
-        <button type="button" class="icon-btn quit" aria-label="Quit">✕</button>
+        <button type="button" class="icon-btn quit" aria-label="${t('ex.quit')}">${icon('close')}</button>
         <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar"></div></div>
         <span class="combo" aria-live="polite"></span>
       </header>
       <main class="session-body"></main>
       <footer class="session-foot">
-        <div class="feedback" aria-live="assertive"></div>
-        <button type="button" class="btn btn-primary btn-block action" disabled>Check</button>
+        <div class="session-foot-inner">
+          <div class="feedback" aria-live="assertive"></div>
+          <button type="button" class="btn btn-primary btn-block action" disabled>${t('btn.check')}</button>
+        </div>
       </footer>
     </div>`;
 
@@ -423,7 +440,7 @@ export function runSession(root, session, { onExit, onFinish }) {
   let phase = 'answer'; // 'answer' | 'waiting' | 'continue'
 
   root.querySelector('.quit').addEventListener('click', () => {
-    if (index === 0 || confirm('Quit now? Progress from this session will not be saved.')) {
+    if (index === 0 || confirm(t('ex.quitConfirm'))) {
       cleanup();
       onExit();
     }
@@ -461,19 +478,19 @@ export function runSession(root, session, { onExit, onFinish }) {
     body.scrollTop = 0;
     if (current.auto === true) {
       phase = 'continue';
-      action.textContent = 'Continue';
+      action.textContent = t('btn.continue');
       action.disabled = false;
       current.mount?.(body);
       return;
     }
     if (current.auto === 'when-done') {
       phase = 'continue';
-      action.textContent = 'Continue';
+      action.textContent = t('btn.continue');
       action.disabled = true;
       current.mount(body, (ready) => (action.disabled = !ready));
       return;
     }
-    action.textContent = current.actionLabel || 'Check';
+    action.textContent = current.actionLabel || t('btn.check');
     action.disabled = true;
     current.mount?.(body, setReady);
   }
@@ -484,8 +501,8 @@ export function runSession(root, session, { onExit, onFinish }) {
     action.hidden = true;
     feedback.innerHTML = `
       <div class="self-grade">
-        <button type="button" class="btn btn-secondary" data-ok="0">✗ Not quite</button>
-        <button type="button" class="btn btn-primary" data-ok="1">✓ I said it</button>
+        <button type="button" class="btn btn-secondary" data-ok="0">${icon('close')} ${t('ex.notQuite')}</button>
+        <button type="button" class="btn btn-primary" data-ok="1">${icon('check')} ${t('ex.saidIt')}</button>
       </div>`;
     return new Promise((resolve) =>
       feedback.querySelectorAll('[data-ok]').forEach((b) =>
@@ -513,23 +530,25 @@ export function runSession(root, session, { onExit, onFinish }) {
       combo++;
       if (!outcome.selfGraded) soundRight();
       foot.classList.add('good');
-      const praise = ['Malamu!', 'Kitoko!', 'Malamu mingi!', 'Ya solo!', 'Ebongi!'][Math.floor(Math.random() * 5)];
       feedback.innerHTML = outcome.typo
-        ? `<strong>Almost!</strong> Watch the spelling: <span lang="ln">${esc(outcome.answer)}</span>`
-        : `<strong>${praise}</strong>${outcome.selfGraded ? '' : ` <span class="feedback-sub">${esc(outcome.sub || '')}</span>`}`;
+        ? `<div class="fb-title">${icon('check')} ${t('ex.almost')}</div><div class="feedback-sub"><span lang="ln">${esc(outcome.answer)}</span></div>`
+        : `<div class="fb-title">${icon('check')} <span lang="ln">${PRAISE[Math.floor(Math.random() * PRAISE.length)]}</span></div>
+           ${outcome.selfGraded ? '' : `<div class="feedback-sub">${esc(outcome.sub || '')}</div>`}`;
     } else {
       r.mistakes++;
       combo = 0;
       if (!outcome.selfGraded) soundWrong();
       foot.classList.add('bad');
-      feedback.innerHTML = `<strong>${outcome.selfGraded ? "Keep practising — it'll come back soon." : 'Correct answer:'}</strong>
-        ${outcome.selfGraded ? '' : `<span lang="ln">${esc(outcome.answer)}</span>`}
-        <div class="feedback-sub">${esc(outcome.sub || '')}</div>`;
+      feedback.innerHTML = outcome.selfGraded
+        ? `<div class="fb-title">${t('ex.keepPractising')}</div><div class="feedback-sub">${esc(outcome.sub || '')}</div>`
+        : `<div class="fb-title">${icon('close')} ${t('ex.correct')}</div>
+           <div class="fb-answer" lang="ln">${esc(outcome.answer)}</div>
+           <div class="feedback-sub">${esc(outcome.sub || '')}</div>`;
       // Ask again a few steps later — retrieval right after an error is where learning happens.
       if (!session.noRequeue) queue.splice(Math.min(queue.length, index + 3), 0, { ...step });
     }
-    comboEl.textContent = combo >= 3 ? `🔥 ${combo}` : '';
-    action.textContent = 'Continue';
+    comboEl.innerHTML = combo >= 3 ? `${icon('flame')} ${combo}` : '';
+    action.textContent = t('btn.continue');
     action.disabled = false;
   }
 

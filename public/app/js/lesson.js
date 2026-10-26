@@ -169,15 +169,17 @@ export function buildCheckpoint(levelId, rand = Math.random) {
 
 // Multiple-choice options: the answer plus 3 distractors, preferring the same
 // unit and the same shape (word vs phrase) so the choice is a real test.
+// `field` is a property name ('lg', 'en') or a function returning the text to compare.
 export function choices(item, field, rand = Math.random, n = 4) {
-  const seen = new Set([normalize(item[field])]);
+  const text = typeof field === 'function' ? field : (i) => i[field];
+  const seen = new Set([normalize(text(item))]);
   const pool = [
     ...shuffle(ITEMS.filter((i) => i.unit === item.unit && i.id !== item.id), rand),
     ...shuffle(ITEMS.filter((i) => i.unit !== item.unit), rand),
   ].sort((a, b) => (isPhrase(a) === isPhrase(item) ? 0 : 1) - (isPhrase(b) === isPhrase(item) ? 0 : 1));
   const picks = [];
   for (const cand of pool) {
-    const key = normalize(cand[field]);
+    const key = normalize(text(cand));
     if (seen.has(key)) continue;
     seen.add(key);
     picks.push(cand);

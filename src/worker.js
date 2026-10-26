@@ -3,11 +3,14 @@
 
 import initSql from '../migrations/0001_init.sql';
 import chatSql from '../migrations/0002_chat.sql';
+import settingsSql from '../migrations/0003_settings.sql';
 import { HttpError, json, readJson, checkOrigin, clientIp, getCookie, rateLimit } from './http.js';
 import { hashPassword, verifyPassword, burnPasswordCheck, newSessionToken, sha256Hex } from './crypto.js';
 import { chatTurn } from './chat.js';
+import { translate } from './translate.js';
 
-const schemaSql = `${initSql}\n${chatSql}`;
+const schemaSql = `${initSql}\n${chatSql}\n${settingsSql}`;
+const BASE_LANGS = ['en', 'fr'];
 
 const SESSION_COOKIE = 'll_session';
 const SESSION_DAYS = 30;
@@ -55,8 +58,9 @@ async function currentUser(request, env) {
   const token = getCookie(request, SESSION_COOKIE);
   if (!token) return null;
   return env.DB.prepare(
-    `SELECT u.id, u.email, u.display_name, u.daily_goal, u.password_hash, s.token_hash
+    `SELECT u.id, u.email, u.display_name, u.daily_goal, u.password_hash, s.token_hash, us.base_lang
        FROM sessions s JOIN users u ON u.id = s.user_id
+       LEFT JOIN user_settings us ON us.user_id = u.id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
   )
     .bind(await sha256Hex(token), Date.now())
@@ -70,7 +74,17 @@ async function requireUser(request, env) {
 }
 
 function publicUser(u) {
-  return { id: u.id, email: u.email, displayName: u.display_name, dailyGoal: u.daily_goal };
+  return { id: u.id, email: u.email, displayName: u.display_name, dailyGoal: u.daily_goal, baseLang: u.base_lang || null };
+}
+
+const cleanBaseLang = (v) => (BASE_LANGS.includes(v) ? v : null);
+
+function saveBaseLang(env, userId, lang) {
+  return env.DB.prepare(
+    'INSERT INTO user_settings (user_id, base_lang) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET base_lang = excluded.base_lang',
+  )
+    .bind(userId, lang)
+    .run();
 }
 
 // --- Validation ---------------------------------------------------------------
@@ -153,13 +167,15 @@ async function signup(request, env, url) {
     id: crypto.randomUUID(),
     email,
     display_name: cleanName(body.displayName),
-    daily_goal: 20,
+    daily_goal: GOALS.includes(body.dailyGoal) ? body.dailyGoal : 20,
+    base_lang: cleanBaseLang(body.baseLang) || 'en',
   };
-  await env.DB.prepare(
-    'INSERT INTO users (id, email, password_hash, display_name, daily_goal, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-  )
-    .bind(user.id, email, await hashPassword(password), user.display_name, user.daily_goal, Date.now())
-    .run();
+  await env.DB.batch([
+    env.DB.prepare(
+      'INSERT INTO users (id, email, password_hash, display_name, daily_goal, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).bind(user.id, email, await hashPassword(password), user.display_name, user.daily_goal, Date.now()),
+    env.DB.prepare('INSERT INTO user_settings (user_id, base_lang) VALUES (?, ?)').bind(user.id, user.base_lang),
+  ]);
 
   return json({ user: publicUser(user) }, 201, { 'Set-Cookie': await startSession(env, url, user.id) });
 }
@@ -172,7 +188,11 @@ async function login(request, env, url) {
   const password = String(body.password || '');
   await verifyTurnstile(env, body.turnstileToken, ip);
 
-  const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+  const user = await env.DB.prepare(
+    'SELECT u.*, us.base_lang FROM users u LEFT JOIN user_settings us ON us.user_id = u.id WHERE u.email = ?',
+  )
+    .bind(email)
+    .first();
   if (!user) {
     await burnPasswordCheck(password);
     throw new HttpError(401, 'Email or password is incorrect.');
@@ -203,6 +223,11 @@ async function updateMe(request, env) {
   await env.DB.prepare('UPDATE users SET daily_goal = ?, display_name = ? WHERE id = ?')
     .bind(user.daily_goal, user.display_name, user.id)
     .run();
+  if (body.baseLang !== undefined) {
+    user.base_lang = cleanBaseLang(body.baseLang);
+    if (!user.base_lang) throw new HttpError(400, 'Unsupported language.');
+    await saveBaseLang(env, user.id, user.base_lang);
+  }
   return json({ user: publicUser(user) });
 }
 
@@ -217,6 +242,8 @@ async function deleteMe(request, env, url) {
     env.DB.prepare('DELETE FROM cards WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM xp_events WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM chat_usage WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM translate_usage WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM user_settings WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id),
   ]);
@@ -301,11 +328,17 @@ async function handleApi(request, env, url) {
       return json({
         turnstileSiteKey: env.TURNSTILE_SECRET_KEY ? env.TURNSTILE_SITE_KEY || null : null,
         chatEnabled: !!env.ANTHROPIC_API_KEY,
+        aiEnabled: !!env.ANTHROPIC_API_KEY,
       });
     case 'POST /api/chat': {
       const user = await requireUser(request, env);
       await rateLimit(env.CHAT_LIMITER, `chat:${user.id}`);
       return json(await chatTurn(env, user, await readJson(request, 64 * 1024)));
+    }
+    case 'POST /api/translate': {
+      const user = await requireUser(request, env);
+      await rateLimit(env.TRANSLATE_LIMITER, `translate:${user.id}`);
+      return json(await translate(env, user, await readJson(request, 8 * 1024)));
     }
     case 'POST /api/auth/signup':
       return signup(request, env, url);
