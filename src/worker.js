@@ -4,12 +4,15 @@
 import initSql from '../migrations/0001_init.sql';
 import chatSql from '../migrations/0002_chat.sql';
 import settingsSql from '../migrations/0003_settings.sql';
+import studySql from '../migrations/0004_study.sql';
 import { HttpError, json, readJson, checkOrigin, clientIp, getCookie, rateLimit } from './http.js';
 import { hashPassword, verifyPassword, burnPasswordCheck, newSessionToken, sha256Hex } from './crypto.js';
 import { chatTurn } from './chat.js';
 import { translate } from './translate.js';
+import { memoryHook } from './hook.js';
+import { ITEM_BY_ID } from '../public/app/js/course.js';
 
-const schemaSql = `${initSql}\n${chatSql}\n${settingsSql}`;
+const schemaSql = `${initSql}\n${chatSql}\n${settingsSql}\n${studySql}`;
 const BASE_LANGS = ['en', 'fr'];
 
 const SESSION_COOKIE = 'll_session';
@@ -123,6 +126,18 @@ async function verifyTurnstile(env, token, ip) {
 }
 
 const num = (v, min, max) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+
+// Limits match NOTE_MAX / HOOK_MAX in public/app/js/store.js.
+function validNote(n) {
+  return (
+    n &&
+    typeof n.id === 'string' &&
+    ITEM_BY_ID.has(n.id) &&
+    typeof n.text === 'string' && n.text.length <= 1000 &&
+    typeof n.hook === 'string' && n.hook.length <= 400 &&
+    num(n.updatedAt, 0, 1e14)
+  );
+}
 
 function validCard(c) {
   return (
@@ -243,6 +258,8 @@ async function deleteMe(request, env, url) {
     env.DB.prepare('DELETE FROM xp_events WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM chat_usage WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM translate_usage WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM item_notes WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM hook_usage WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM user_settings WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id),
@@ -258,7 +275,8 @@ async function sync(request, env) {
   const body = await readJson(request);
   const cards = Array.isArray(body.cards) ? body.cards : [];
   const events = Array.isArray(body.xpEvents) ? body.xpEvents : [];
-  if (cards.length > 1000 || events.length > 1000) throw new HttpError(413, 'Too many items in one sync.');
+  const notes = Array.isArray(body.notes) ? body.notes : [];
+  if (cards.length > 1000 || events.length > 1000 || notes.length > 1000) throw new HttpError(413, 'Too many items in one sync.');
 
   const maxUpdated = Date.now() + DAY_MS; // tolerate clock skew, reject far-future stamps
   const writes = [];
@@ -289,15 +307,26 @@ async function sync(request, env) {
       ),
     );
   }
+  for (const n of notes) {
+    if (!validNote(n) || n.updatedAt > maxUpdated) continue;
+    writes.push(
+      env.DB.prepare(
+        `INSERT INTO item_notes (user_id, item_id, text, hook, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, item_id) DO UPDATE SET text = excluded.text, hook = excluded.hook, updated_at = excluded.updated_at
+         WHERE excluded.updated_at > item_notes.updated_at`,
+      ).bind(user.id, n.id, n.text, n.hook, n.updatedAt),
+    );
+  }
   if (writes.length) await env.DB.batch(writes);
 
-  const [cardRows, dayRows] = await env.DB.batch([
+  const [cardRows, dayRows, noteRows] = await env.DB.batch([
     env.DB.prepare(
       'SELECT card_id, due, interval, ease, reps, lapses, last_review, updated_at FROM cards WHERE user_id = ?',
     ).bind(user.id),
     env.DB.prepare(
       'SELECT day, SUM(xp) AS xp FROM xp_events WHERE user_id = ? GROUP BY day ORDER BY day DESC LIMIT 400',
     ).bind(user.id),
+    env.DB.prepare('SELECT item_id, text, hook, updated_at FROM item_notes WHERE user_id = ?').bind(user.id),
   ]);
 
   return json({
@@ -313,6 +342,7 @@ async function sync(request, env) {
     })),
     days: dayRows.results.map((r) => ({ day: r.day, xp: r.xp })),
     acceptedEventIds: events.filter(validXpEvent).map((e) => e.id),
+    notes: noteRows.results.map((r) => ({ id: r.item_id, text: r.text, hook: r.hook, updatedAt: r.updated_at })),
   });
 }
 
@@ -339,6 +369,11 @@ async function handleApi(request, env, url) {
       const user = await requireUser(request, env);
       await rateLimit(env.TRANSLATE_LIMITER, `translate:${user.id}`);
       return json(await translate(env, user, await readJson(request, 8 * 1024)));
+    }
+    case 'POST /api/hook': {
+      const user = await requireUser(request, env);
+      await rateLimit(env.TRANSLATE_LIMITER, `hook:${user.id}`);
+      return json(await memoryHook(env, user, await readJson(request, 4 * 1024)));
     }
     case 'POST /api/auth/signup':
       return signup(request, env, url);

@@ -79,10 +79,10 @@ function dictRow(item) {
   const learned = isLearned(store.getCard(item.id));
   return `
     <li class="dict-row">
-      <span class="dict-main">
+      <a class="dict-main" href="#/card/${item.id}">
         <span class="dict-lg" lang="ln">${esc(item.lg)}</span>
         <span class="dict-gloss">${esc(gloss(item))}</span>
-      </span>
+      </a>
       <span class="dict-tags">
         ${item.local ? `<span class="badge badge-local">${t('badge.local')}</span>` : ''}
         ${learned ? `<span class="badge badge-done">${icon('check')} ${t('badge.learned')}</span>` : ''}

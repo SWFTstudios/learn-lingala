@@ -13,6 +13,7 @@ import { chatPickerHtml, mountChat, isScenario, clearChats } from './chat.js';
 import { translateHtml, wireTranslate, clearRecent } from './translate.js';
 import { t, tn, setLang, getLang, LANGS, gloss, unitText, levelText, dialogueText } from './i18n.js';
 import { icon, unitIcon } from './icons.js';
+import { studyDecksHtml, wireStudyDecks, mountStudy, cardPageHtml, wireCardBody, deckItems } from './study.js';
 import { installCardHtml, installSettingsHtml, promptInstall, dismissInstall, onInstallChange, initOfflineBanner } from './pwa.js';
 
 const app = document.getElementById('app');
@@ -337,12 +338,14 @@ function strengthLabel(card) {
 
 function wordRow(i) {
   const [cls, label] = strengthLabel(store.getCard(i.id));
-  return `<li class="word">
+  const note = store.getNote(i.id);
+  return `<li><a class="word" href="#/card/${i.id}">
     <span class="word-main"><span class="word-lg" lang="ln">${esc(i.lg)}</span>
     <span class="word-en">${esc(gloss(i))}</span></span>
+    ${note && (note.text || note.hook) ? `<span class="word-note" title="${t('card.notes')}">${icon('book')}</span>` : ''}
     ${i.local ? `<span class="badge badge-local">${t('badge.local')}</span>` : ''}
     <span class="strength strength-${cls}">${label}</span>
-  </li>`;
+  </a></li>`;
 }
 
 function unitScreen(id) {
@@ -363,7 +366,10 @@ function unitScreen(id) {
         <p class="lede"><span lang="ln">${esc(unit.lg)}</span> · ${t('home.learnedOf', { n: p.learned, total: p.total })}</p>
       </div>
     </header>
-    <a href="#/lesson/${unit.id}" class="btn btn-primary btn-block">${icon('play')} ${p.done ? t('unit.practice') : p.learned ? t('unit.continue') : t('unit.start')}</a>
+    <div class="unit-actions">
+      <a href="#/lesson/${unit.id}" class="btn btn-primary">${icon('play')} ${p.done ? t('unit.practice') : p.learned ? t('unit.continue') : t('unit.start')}</a>
+      <a href="#/study/unit:${unit.id}" class="btn btn-secondary">${icon('book')} ${t('unit.study')}</a>
+    </div>
     <h2 class="section-title">${t('unit.how')}</h2>
     <div class="notes card">${text.intro}</div>
     ${
@@ -421,7 +427,8 @@ function reviewScreen() {
             <div class="sg sg-ok"><b>${buckets.ok}</b>${t('str.ok')}</div>
             <div class="sg sg-strong"><b>${buckets.strong}</b>${t('str.strong')}</div>
             <div class="sg sg-mastered"><b>${buckets.mastered}</b>${t('str.mastered')}</div>
-          </div>`
+          </div>
+          ${studyDecksHtml()}`
     }
     ${
       talkable.length
@@ -444,6 +451,11 @@ const chatScreen = () =>
   shell('chat', chatPickerHtml({ aiEnabled: config.aiEnabled, signedIn: !!store.user(), currentLevelId: currentLevel().id }));
 
 const translateScreen = () => shell('translate', translateHtml({ aiEnabled: config.aiEnabled }));
+
+const cardScreen = (id) => {
+  const html = cardPageHtml(id, { aiEnabled: config.aiEnabled, signedIn: !!store.user() });
+  return html ? shell('learn', html) : homeScreen();
+};
 
 // --- Account ------------------------------------------------------------------------
 
@@ -825,6 +837,19 @@ function render() {
     location.hash = '#/review';
     return;
   }
+  if (route === 'study' && arg && deckItems(arg, store.getCard).length) {
+    document.body.classList.add('in-session');
+    stopSession = mountStudy(app, arg, {
+      aiEnabled: config.aiEnabled,
+      signedIn: !!store.user(),
+      onExit: () => {
+        endSession();
+        history.replaceState(null, '', arg.startsWith('unit:') ? `#/unit/${arg.slice(5)}` : '#/review');
+        render();
+      },
+    });
+    return;
+  }
   if (route === 'chat' && isScenario(arg) && config.aiEnabled && store.user()) {
     document.body.classList.add('in-session');
     stopSession = mountChat(app, arg, {
@@ -850,11 +875,14 @@ function render() {
     : route === 'chat' ? chatScreen()
     : route === 'translate' || route === 'phrases' ? translateScreen()
     : route === 'account' ? accountScreen(arg === 'login' ? 'login' : 'signup')
+    : route === 'card' ? cardScreen(arg)
     : homeScreen();
 
   if (route === 'account') wireAccount();
   if (route === 'translate' || route === 'phrases') wireTranslate(app, { rerender: render });
   if (route === 'unit') wireBubbles();
+  if (route === 'review') wireStudyDecks(app, render);
+  if (route === 'card') wireCardBody(app);
   document.title = `${t(`title.${route || 'learn'}`)} · Learn Lingala`;
   window.scrollTo(0, 0);
 }
